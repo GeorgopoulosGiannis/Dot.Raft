@@ -1,23 +1,89 @@
 namespace Dot.Raft;
 
-public class RaftNode(NodeId nodeId, List<NodeId> peers, IRaftTransport transport)
+public class RaftNode
 {
-    public RaftNode(NodeId nodeId, List<NodeId> peers, IRaftTransport transport, State state) : this(nodeId, peers,
-        transport)
+    private State State { get; } = new();
+
+    private int _elapsedTicks = 0;
+    private int _electionTimeoutTicks;
+    private readonly IRaftTransport _transport;
+    private readonly IElectionTimeoutProvider _electionTimeoutProvider;
+    private List<NodeId> _peers;
+
+    /// <summary>
+    /// Only for unit tests.
+    /// </summary>
+    internal RaftNode(
+        NodeId nodeId,
+        List<NodeId> peers,
+        IRaftTransport transport,
+        State state,
+        IElectionTimeoutProvider electionTimeoutProvider,
+        RaftRole role = RaftRole.Follower
+    ) : this(nodeId, peers, transport, electionTimeoutProvider)
     {
         State = state;
+        Role = role;
     }
 
-    private readonly NodeId _id = nodeId;
+    /// <summary>
+    /// Creates a new <see cref="RaftNode"/>.
+    /// </summary>
+    /// <param name="nodeId">The <see cref="NodeId"/> of the current node.</param>
+    /// <param name="peers">The peers of the RAFT cluster.</param>
+    /// <param name="transport">The <see cref="IRaftTransport"/> to use for sending messages to peers.</param>
+    /// <param name="electionTimeoutProvider">The <see cref="IElectionTimeoutProvider"/> to use in order to get election timeout ticks.</param>
+    public RaftNode(NodeId nodeId,
+        List<NodeId> peers,
+        IRaftTransport transport,
+        IElectionTimeoutProvider electionTimeoutProvider)
+    {
+        _transport = transport;
+        _electionTimeoutProvider = electionTimeoutProvider;
+        _peers = peers;
+        Id = nodeId;
+        ResetElectionTimeout();
+    }
 
-    private readonly IRaftTransport _transport = transport;
-    private RaftRole Role { get; set; } = RaftRole.Follower;
-    private State State { get; init; } = new();
+    public NodeId Id { get; }
+    public RaftRole Role { get; private set; } = RaftRole.Follower;
 
-    public Task TickAsync()
+    public async Task TickAsync()
     {
         // Logic for election timeout, heartbeats, etc. will go here.
-        return Task.CompletedTask;
+        _elapsedTicks++;
+
+        if (Role is RaftRole.Follower or RaftRole.Candidate && _elapsedTicks >= _electionTimeoutTicks)
+        {
+            await StartElectionAsync();
+        }
+    }
+
+    private async Task StartElectionAsync()
+    {
+        Role = RaftRole.Candidate;
+        State.CurrentTerm++;
+        State.VotedFor = Id;
+        _elapsedTicks = 0;
+        ResetElectionTimeout();
+
+        var lastLogIndex = State.LogEntries.Count - 1;
+        var lastLogTerm = State.LogEntries.Count > 0
+            ? State.LogEntries[^1].Term
+            : new Term(0);
+
+        var request = new RequestVoteRequest
+        {
+            Term = State.CurrentTerm,
+            CandidateId = Id,
+            LastLogIndex = lastLogIndex,
+            LastLogTerm = lastLogTerm
+        };
+
+        foreach (var peer in _peers)
+        {
+            await _transport.SendAsync(peer, request);
+        }
     }
 
     /// <summary>
@@ -39,6 +105,7 @@ public class RaftNode(NodeId nodeId, List<NodeId> peers, IRaftTransport transpor
             return;
         }
 
+        Role = RaftRole.Follower;
         State.CurrentTerm = requestVoteRequest.Term;
 
         var alreadyVoted = State.VotedFor is not null && State.VotedFor != requestVoteRequest.CandidateId;
@@ -85,6 +152,11 @@ public class RaftNode(NodeId nodeId, List<NodeId> peers, IRaftTransport transpor
     public Task SubmitCommandAsync(object command)
     {
         return Task.CompletedTask;
+    }
+
+    private void ResetElectionTimeout()
+    {
+        _electionTimeoutTicks = _electionTimeoutProvider.GetTimeoutTicks();
     }
 }
 

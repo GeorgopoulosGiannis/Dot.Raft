@@ -21,4 +21,9 @@ public readonly record struct Term(int Value)
     {
         return left.Value <= right.Value;
     }
+
+    public static Term operator ++(Term term)
+    {
+        return new Term(Value: term.Value + 1);
+    }
 }
