@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft", "Dot.Raft\Dot.Raft.csproj", "{125115DD-964A-47CA-9363-644E8BF8C491}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.TestHarness", "Dot.Raft.TestHarness\Dot.Raft.TestHarness.csproj", "{D860BB7B-CB02-4E2F-9746-034552ED020F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.UnitTests", "Dot.Raft.UnitTests\Dot.Raft.UnitTests.csproj", "{615B7024-026F-4FC2-A0C1-72394BCD1515}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{125115DD-964A-47CA-9363-644E8BF8C491}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{125115DD-964A-47CA-9363-644E8BF8C491}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{125115DD-964A-47CA-9363-644E8BF8C491}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{125115DD-964A-47CA-9363-644E8BF8C491}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D860BB7B-CB02-4E2F-9746-034552ED020F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D860BB7B-CB02-4E2F-9746-034552ED020F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D860BB7B-CB02-4E2F-9746-034552ED020F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D860BB7B-CB02-4E2F-9746-034552ED020F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{615B7024-026F-4FC2-A0C1-72394BCD1515}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{615B7024-026F-4FC2-A0C1-72394BCD1515}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{615B7024-026F-4FC2-A0C1-72394BCD1515}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{615B7024-026F-4FC2-A0C1-72394BCD1515}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
