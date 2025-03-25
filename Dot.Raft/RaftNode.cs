@@ -8,7 +8,9 @@ public class RaftNode
     private int _electionTimeoutTicks;
     private readonly IRaftTransport _transport;
     private readonly IElectionTimeoutProvider _electionTimeoutProvider;
-    private List<NodeId> _peers;
+    private readonly List<NodeId> _peers;
+    private HashSet<NodeId> _votesReceived = [];
+
 
     /// <summary>
     /// Only for unit tests.
@@ -27,7 +29,7 @@ public class RaftNode
     }
 
     /// <summary>
-    /// Creates a new <see cref="RaftNode"/>.
+    /// Creates a new <see cref="Raft.RaftNode"/>.
     /// </summary>
     /// <param name="nodeId">The <see cref="NodeId"/> of the current node.</param>
     /// <param name="peers">The peers of the RAFT cluster.</param>
@@ -86,6 +88,23 @@ public class RaftNode
         }
     }
 
+    private void ResetElectionTimeout()
+    {
+        _electionTimeoutTicks = _electionTimeoutProvider.GetTimeoutTicks();
+    }
+
+    public async Task ReceiveAsync(object message)
+    {
+        var task = message switch
+        {
+            RequestVoteRequest request => ReceiveAsync(request),
+            RequestVoteResponse response => ReceiveAsync(response),
+            AppendEntriesRequest request => ReceiveAsync(request),
+            _ => Task.CompletedTask,
+        };
+        await task;
+    }
+
     /// <summary>
     /// Handles a <see cref="RequestVoteRequest"/>.
     /// The receiver will:
@@ -93,7 +112,7 @@ public class RaftNode
     /// 2. Grant vote,if votedFor is null or candidateId, and candidate's log is at least as up-to-date as receiver's log. 
     /// </summary>
     /// <param name="requestVoteRequest"></param>
-    public async Task ReceiveAsync(RequestVoteRequest requestVoteRequest)
+    private async Task ReceiveAsync(RequestVoteRequest requestVoteRequest)
     {
         if (requestVoteRequest.Term < State.CurrentTerm)
         {
@@ -112,6 +131,11 @@ public class RaftNode
         var logUpToDate = IsCandidateLogUpToDate(requestVoteRequest.LastLogIndex, requestVoteRequest.LastLogTerm);
 
         var shouldGrantVote = !alreadyVoted && logUpToDate;
+
+        if (shouldGrantVote)
+        {
+            State.VotedFor = requestVoteRequest.CandidateId;
+        }
 
         await _transport.SendAsync(requestVoteRequest.CandidateId, new RequestVoteResponse
         {
@@ -143,8 +167,38 @@ public class RaftNode
         return candidateLastIndex >= lastLocalLogIndex;
     }
 
+    private async Task ReceiveAsync(RequestVoteResponse response)
+    {
+        // response term was greater than anything seen, convert to follower
+        if (response.Term > State.CurrentTerm)
+        {
+            _votesReceived.Clear();
+            Role = RaftRole.Follower;
+            State.CurrentTerm = response.Term;
+            State.VotedFor = null;
+            return;
+        }
 
-    public Task ReceiveAsync(AppendEntriesRequest appendEntriesRequest)
+        // If old response ignore
+        if (Role != RaftRole.Candidate || response.Term < State.CurrentTerm)
+        {
+            return;
+        }
+
+        // if (res.VoteGranted)
+        // {
+        //     _votesReceived.Add(Id); // always include self
+        //     var majority = (_peers.Count + 1) / 2 + 1;
+        //
+        //     if (_votesReceived.Count >= majority)
+        //     {
+        //         _role = RaftRole.Leader;
+        //         // TODO: initialize leader state (nextIndex[], matchIndex[]) later
+        //     }
+        // }
+    }
+
+    private Task ReceiveAsync(AppendEntriesRequest appendEntriesRequest)
     {
         return Task.CompletedTask;
     }
@@ -152,11 +206,6 @@ public class RaftNode
     public Task SubmitCommandAsync(object command)
     {
         return Task.CompletedTask;
-    }
-
-    private void ResetElectionTimeout()
-    {
-        _electionTimeoutTicks = _electionTimeoutProvider.GetTimeoutTicks();
     }
 }
 
