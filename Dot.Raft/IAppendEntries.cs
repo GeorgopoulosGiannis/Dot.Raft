@@ -30,12 +30,12 @@ public record AppendEntriesRequest
     /// <summary>
     /// Leader's term.
     /// </summary>
-    public required int Term { get; init; }
+    public required Term Term { get; init; }
 
     /// <summary>
     /// So followers can redirect clients.
     /// </summary>
-    public required int LeaderId { get; init; }
+    public required NodeId LeaderId { get; init; }
 
     /// <summary>
     /// Index of log entry immediately preceding new ones.
@@ -45,7 +45,7 @@ public record AppendEntriesRequest
     /// <summary>
     /// Term of <see cref="AppendEntriesRequest.PrevLogIndex"/> entry.
     /// </summary>
-    public required int PrevLogTerm { get; init; }
+    public required Term PrevLogTerm { get; init; }
 
     /// <summary>
     /// Log entries to store.
@@ -73,5 +73,5 @@ public record AppendEntriesResponse
     /// <summary>
     /// currentTerm, for leader to update itself.
     /// </summary>
-    public int Term { get; init; }
+    public Term Term { get; init; }
 }

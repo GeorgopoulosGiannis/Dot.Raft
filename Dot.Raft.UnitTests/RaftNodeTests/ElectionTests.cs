@@ -30,7 +30,7 @@ public class ElectionTests
         var timeoutProvider = new FixedElectionTimeout(3);
 
         var node = new RaftNode(nodeId, [peerId], transport, timeoutProvider);
-        
+
         // Tick 1
         await node.TickAsync();
         // Tick 2
@@ -47,5 +47,71 @@ public class ElectionTests
         request.ShouldNotBeNull();
         request.Term.ShouldBe(new Term(1));
         request.CandidateId.ShouldBe(nodeId);
+    }
+
+    [Fact]
+    public async Task BecomesLeader_WhenMajorityVotesAreReceived()
+    {
+        var nodeId = new NodeId(1);
+        var peerIds = new[] { new NodeId(2), new NodeId(3), new NodeId(4) };
+
+
+        var transport = new FakeTransport((_, _) => { });
+        var timeoutProvider = new FixedElectionTimeout(1); // 1 tick to trigger immediately
+
+        var node = new RaftNode(nodeId, peerIds.ToList(), transport, timeoutProvider);
+
+        // Trigger election
+        await node.TickAsync();
+
+        // Simulate receiving votes from two peers
+        var vote1 = new RequestVoteResponse
+        {
+            Term = new Term(1),
+            ReplierId = new NodeId(2),
+            VoteGranted = true,
+        };
+        var vote2 = new RequestVoteResponse
+        {
+            Term = new Term(1),
+            ReplierId = new NodeId(3),
+            VoteGranted = true,
+        };
+
+        await node.ReceiveAsync(vote1);
+        await node.ReceiveAsync(vote2);
+
+        node.Role.ShouldBe(RaftRole.Leader);
+    }
+
+    [Fact]
+    public async Task BecomesFollower_WhenNewestTermIsSeen()
+    {
+        var nodeId = new NodeId(1);
+        var peerIds = new[] { new NodeId(2), new NodeId(3), new NodeId(4) };
+
+
+        var transport = new FakeTransport((_, _) => { });
+        var timeoutProvider = new FixedElectionTimeout(1);
+
+        var node = new RaftNode(
+            nodeId,
+            peerIds.ToList(),
+            transport,
+            new State(),
+            timeoutProvider,
+            RaftRole.Candidate);
+
+        // Receive vote response with greater term
+        var vote1 = new RequestVoteResponse
+        {
+            Term = new Term(5),
+            ReplierId = new NodeId(2),
+            VoteGranted = false,
+        };
+
+        await node.ReceiveAsync(vote1);
+
+        node.Role.ShouldBe(RaftRole.Follower);
     }
 }

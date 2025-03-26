@@ -44,6 +44,11 @@ public record RequestVoteRequest
 public record RequestVoteResponse
 {
     /// <summary>
+    /// The id of the node that sends the response.
+    /// </summary>
+    public required NodeId ReplierId { get; init; }
+
+    /// <summary>
     /// Current term for candidate to update itself.
     /// </summary>
     public required Term Term { get; init; } = default;

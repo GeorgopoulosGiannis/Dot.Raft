@@ -13,7 +13,7 @@ public class RaftNode
 
 
     /// <summary>
-    /// Only for unit tests.
+    /// Used in unit tests.
     /// </summary>
     internal RaftNode(
         NodeId nodeId,
@@ -67,6 +67,8 @@ public class RaftNode
         State.CurrentTerm++;
         State.VotedFor = Id;
         _elapsedTicks = 0;
+        _votesReceived = [Id];
+
         ResetElectionTimeout();
 
         var lastLogIndex = State.LogEntries.Count - 1;
@@ -118,8 +120,9 @@ public class RaftNode
         {
             await _transport.SendAsync(requestVoteRequest.CandidateId, new RequestVoteResponse
             {
-                VoteGranted = false,
+                ReplierId = Id,
                 Term = State.CurrentTerm,
+                VoteGranted = false,
             });
             return;
         }
@@ -127,8 +130,11 @@ public class RaftNode
         Role = RaftRole.Follower;
         State.CurrentTerm = requestVoteRequest.Term;
 
-        var alreadyVoted = State.VotedFor is not null && State.VotedFor != requestVoteRequest.CandidateId;
-        var logUpToDate = IsCandidateLogUpToDate(requestVoteRequest.LastLogIndex, requestVoteRequest.LastLogTerm);
+        var alreadyVoted = State.VotedFor is not null
+                           && State.VotedFor != requestVoteRequest.CandidateId;
+
+        var logUpToDate =
+            IsCandidateLogUpToDate(requestVoteRequest.LastLogIndex, requestVoteRequest.LastLogTerm);
 
         var shouldGrantVote = !alreadyVoted && logUpToDate;
 
@@ -139,8 +145,9 @@ public class RaftNode
 
         await _transport.SendAsync(requestVoteRequest.CandidateId, new RequestVoteResponse
         {
-            VoteGranted = shouldGrantVote,
+            ReplierId = Id,
             Term = State.CurrentTerm,
+            VoteGranted = shouldGrantVote,
         });
     }
 
@@ -185,22 +192,84 @@ public class RaftNode
             return;
         }
 
-        // if (res.VoteGranted)
-        // {
-        //     _votesReceived.Add(Id); // always include self
-        //     var majority = (_peers.Count + 1) / 2 + 1;
-        //
-        //     if (_votesReceived.Count >= majority)
-        //     {
-        //         _role = RaftRole.Leader;
-        //         // TODO: initialize leader state (nextIndex[], matchIndex[]) later
-        //     }
-        // }
+        if (response.VoteGranted)
+        {
+            _votesReceived.Add(response.ReplierId);
+            var majority = (_peers.Count + 1) / 2 + 1;
+
+            if (_votesReceived.Count >= majority)
+            {
+                Role = RaftRole.Leader;
+                // TODO: initialize leader state (nextIndex[], matchIndex[]) later
+            }
+        }
     }
 
-    private Task ReceiveAsync(AppendEntriesRequest appendEntriesRequest)
+    private async Task ReceiveAsync(AppendEntriesRequest request)
     {
-        return Task.CompletedTask;
+        if (request.Term < State.CurrentTerm)
+        {
+            await _transport.SendAsync(request.LeaderId, new AppendEntriesResponse
+            {
+                Term = State.CurrentTerm,
+                Success = false,
+            });
+            return;
+        }
+
+        if (request.Term > State.CurrentTerm)
+        {
+            Role = RaftRole.Follower;
+            State.CurrentTerm = request.Term;
+            State.VotedFor = null;
+        }
+
+        _elapsedTicks = 0;
+
+        if (request.PrevLogIndex >= State.LogEntries.Count ||
+            (request.PrevLogIndex >= 0 &&
+             State.LogEntries[request.PrevLogIndex].Term != request.PrevLogTerm))
+        {
+            await _transport.SendAsync(request.LeaderId, new AppendEntriesResponse
+            {
+                Term = State.CurrentTerm,
+                Success = false,
+            });
+            return;
+        }
+
+        // Remove conflict entries
+        var index = request.PrevLogIndex + 1;
+        var entryIdx = 0;
+        while (index < State.LogEntries.Count && entryIdx < request.Entries.Length)
+        {
+            if (State.LogEntries[index].Term != request.Entries[entryIdx].Term)
+            {
+                State.LogEntries.RemoveRange(index, State.LogEntries.Count - index);
+                break;
+            }
+
+            index++;
+            entryIdx++;
+        }
+
+        // Append new entries
+        for (; entryIdx < request.Entries.Length; entryIdx++)
+        {
+            State.LogEntries.Add(request.Entries[entryIdx]);
+        }
+
+        // Update commit index
+        if (request.LeaderCommit > State.CommitIndex)
+        {
+            State.CommitIndex = Math.Min(request.LeaderCommit, State.LogEntries.Count - 1);
+        }
+
+        await _transport.SendAsync(request.LeaderId, new AppendEntriesResponse
+        {
+            Term = State.CurrentTerm,
+            Success = true,
+        });
     }
 
     public Task SubmitCommandAsync(object command)
