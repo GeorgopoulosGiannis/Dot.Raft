@@ -23,7 +23,7 @@ public interface IAppendEntries
 }
 
 /// <summary>
-/// The arguments for the <see cref="IAppendEntries.InvokeAsync"/>.
+/// The arguments for the <see cref="IAppendEntries.AppendEntriesAsync"/>.
 /// </summary>
 public record AppendEntriesRequest
 {

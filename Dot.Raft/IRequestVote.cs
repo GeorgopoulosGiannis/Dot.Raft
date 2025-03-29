@@ -8,14 +8,14 @@ public interface IRequestVote
     /// <summary>
     /// Invoked by candidates to gather votes.
     /// </summary>
-    /// <param name="arguments"><see cref="RequestVoteRequest"/>.</param>
-    Task RequestVoteAsync(RequestVoteRequest arguments);
+    /// <param name="arguments"><see cref="RequestVote"/>.</param>
+    Task RequestVoteAsync(RequestVote arguments);
 }
 
 /// <summary>
 /// The arguments required to request a vote.
 /// </summary>
-public record RequestVoteRequest
+public record RequestVote
 {
     /// <summary>
     /// Candidate's term.
@@ -43,10 +43,6 @@ public record RequestVoteRequest
 /// </summary>
 public record RequestVoteResponse
 {
-    /// <summary>
-    /// The id of the node that sends the response.
-    /// </summary>
-    public required NodeId ReplierId { get; init; }
 
     /// <summary>
     /// Current term for candidate to update itself.

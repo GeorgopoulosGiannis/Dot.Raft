@@ -4,37 +4,18 @@ namespace Dot.Raft.UnitTests.RaftNodeTests;
 
 public class AppendEntriesTests
 {
-    private record SentMessage(NodeId To, object Message);
-
-    private class TestTransport : IRaftTransport
-    {
-        public List<SentMessage> Sent = new();
-
-        public Task SendAsync<T>(NodeId sendTo, T command)
-        {
-            Sent.Add(new SentMessage(sendTo, command!));
-            return Task.CompletedTask;
-        }
-    }
-
-    private class FixedElectionTimeout(int ticks) : IElectionTimeoutProvider
-    {
-        public int GetTimeoutTicks() => ticks;
-    }
-
-
     [Fact]
     public async Task RejectsAppendEntries_WhenTermIsLessThanCurrent()
     {
+        var state = new State { CurrentTerm = new Term(5) };
         var transport = new TestTransport();
-
         var node = new RaftNode(
             new NodeId(1),
             [new NodeId(2)],
             transport,
-            new State { CurrentTerm = new Term(5) },
-            new FixedElectionTimeout(100)
-        );
+            state,
+            new FixedElectionTimeout(100),
+            new DummyStateMachine());
 
         var request = new AppendEntriesRequest
         {
@@ -46,7 +27,7 @@ public class AppendEntriesTests
             LeaderCommit = 0
         };
 
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(request.LeaderId, request);
 
         var response = transport.Sent[0].Message as AppendEntriesResponse;
         response.ShouldNotBeNull();
@@ -57,21 +38,20 @@ public class AppendEntriesTests
     [Fact]
     public async Task RejectsAppendEntries_WhenPrevLogTermDoesNotMatch()
     {
+        var state = new State
+        {
+            CurrentTerm = new Term(5),
+        };
+        state.AddLogEntry(new Term(4), "cmd1");
+
         var transport = new TestTransport();
         var node = new RaftNode(
             new NodeId(1),
             [new NodeId(2)],
             transport,
-            new State
-            {
-                CurrentTerm = new Term(5),
-                LogEntries =
-                [
-                    new LogEntry { Term = new Term(4), Command = "cmd1" } // Index 0
-                ]
-            },
-            new FixedElectionTimeout(100)
-        );
+            state,
+            new FixedElectionTimeout(100),
+            new DummyStateMachine());
 
         var request = new AppendEntriesRequest
         {
@@ -82,7 +62,8 @@ public class AppendEntriesTests
             Entries = [],
             LeaderCommit = 0
         };
-        await node.ReceiveAsync(request);
+
+        await node.ReceivePeerMessageAsync(request.LeaderId, request);
 
         var response = transport.Sent[0].Message as AppendEntriesResponse;
         response.ShouldNotBeNull();
@@ -93,30 +74,31 @@ public class AppendEntriesTests
     [Fact]
     public async Task AcceptsAppendEntries_AndUpdatesTerm_WhenTermIsGreater()
     {
-        var transport = new TestTransport();
         var state = new State { CurrentTerm = new Term(2) };
+        var transport = new TestTransport();
         var node = new RaftNode(
             new NodeId(1),
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100)
-        );
+            new FixedElectionTimeout(100),
+            new DummyStateMachine());
+
         var request = new AppendEntriesRequest
         {
             Term = new Term(3),
             LeaderId = new NodeId(2),
             PrevLogIndex = -1,
             PrevLogTerm = new Term(0),
-            Entries = [new LogEntry { Term = new Term(3), Command = "set x" }],
+            Entries = [new LogEntry(new Term(3), "set x")],
             LeaderCommit = 0
         };
 
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(request.LeaderId, request);
 
         state.CurrentTerm.ShouldBe(new Term(3));
-        state.LogEntries.Count.ShouldBe(1);
-        state.LogEntries[0].Command.ShouldBe("set x");
+        state.GetCount().ShouldBe(1);
+        state.GetCommandAtIndex(0).ShouldBe("set x");
 
         var response = transport.Sent[0].Message as AppendEntriesResponse;
         response.ShouldNotBeNull();
@@ -129,22 +111,18 @@ public class AppendEntriesTests
         var state = new State
         {
             CurrentTerm = new Term(5),
-            LogEntries =
-            [
-                new LogEntry { Term = new Term(1), Command = "old1" },
-                new LogEntry { Term = new Term(2), Command = "old2" }
-            ]
         };
+        state.AddLogEntry(new Term(1), "old1");
+        state.AddLogEntry(new Term(2), "old2");
 
         var transport = new TestTransport();
-
         var node = new RaftNode(
             new NodeId(1),
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100)
-        );
+            new FixedElectionTimeout(100),
+            new DummyStateMachine());
 
         var request = new AppendEntriesRequest
         {
@@ -154,17 +132,17 @@ public class AppendEntriesTests
             PrevLogTerm = new Term(1),
             Entries =
             [
-                new LogEntry { Term = new Term(3), Command = "new2" },
-                new LogEntry { Term = new Term(3), Command = "new3" }
+                new LogEntry(new Term(3), "new2"),
+                new LogEntry(new Term(3), "new3")
             ],
             LeaderCommit = 0
         };
 
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(request.LeaderId, request);
 
-        state.LogEntries.Count.ShouldBe(3);
-        state.LogEntries[1].Command.ShouldBe("new2");
-        state.LogEntries[2].Command.ShouldBe("new3");
+        state.GetCount().ShouldBe(3);
+        state.GetCommandAtIndex(1).ShouldBe("new2");
+        state.GetCommandAtIndex(2).ShouldBe("new3");
 
         var response = transport.Sent[0].Message as AppendEntriesResponse;
         response!.Success.ShouldBeTrue();
@@ -173,14 +151,9 @@ public class AppendEntriesTests
     [Fact]
     public async Task AppendsNewEntries_WhenLogMatches()
     {
-        var state = new State
-        {
-            CurrentTerm = new Term(5),
-            LogEntries =
-            [
-                new LogEntry { Term = new Term(1), Command = "set x" }
-            ]
-        };
+        var state = new State();
+        state.AddLogEntry(new Term(1), "set x");
+        state.CurrentTerm = new Term(5);
 
         var transport = new TestTransport();
         var node = new RaftNode(
@@ -188,8 +161,8 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100)
-        );
+            new FixedElectionTimeout(100),
+            new DummyStateMachine());
 
         var request = new AppendEntriesRequest
         {
@@ -197,14 +170,14 @@ public class AppendEntriesTests
             LeaderId = new NodeId(2),
             PrevLogIndex = 0,
             PrevLogTerm = new Term(1),
-            Entries = [new LogEntry { Term = new Term(5), Command = "set y" }],
+            Entries = [new LogEntry(new Term(5), "set y")],
             LeaderCommit = 0
         };
 
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(request.LeaderId, request);
 
-        state.LogEntries.Count.ShouldBe(2);
-        state.LogEntries[1].Command.ShouldBe("set y");
+        state.GetCount().ShouldBe(2);
+        state.GetCommandAtIndex(1).ShouldBe("set y");
     }
 
     [Fact]
@@ -213,13 +186,10 @@ public class AppendEntriesTests
         var state = new State
         {
             CurrentTerm = new Term(5),
-            LogEntries =
-            [
-                new LogEntry { Term = new Term(1), Command = "cmd0" },
-                new LogEntry { Term = new Term(2), Command = "cmd1" }
-            ],
             CommitIndex = 0
         };
+        state.AddLogEntry(new Term(1), "cmd0");
+        state.AddLogEntry(new Term(2), "cmd1");
 
         var transport = new TestTransport();
         var node = new RaftNode(
@@ -227,8 +197,8 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100)
-        );
+            new FixedElectionTimeout(100),
+            new DummyStateMachine());
 
         var request = new AppendEntriesRequest
         {
@@ -240,8 +210,152 @@ public class AppendEntriesTests
             LeaderCommit = 10
         };
 
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(request.LeaderId, request);
 
-        state.CommitIndex.ShouldBe(1); // min(10, lastLogIndex = 1)
+        state.CommitIndex.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task DoesNotUpdateCommitIndex_WhenLeaderCommitIsZero()
+    {
+        var transport = new TestTransport();
+        var state = new State
+        {
+            CurrentTerm = new Term(3),
+            CommitIndex = 1,
+        };
+        state.AddLogEntry(new Term(1), "cmd0");
+        state.AddLogEntry(new Term(2), "cmd1");
+
+
+        var node = new RaftNode(
+            new NodeId(1),
+            [new NodeId(2)],
+            transport,
+            state,
+            new FixedElectionTimeout(100),
+            new DummyStateMachine());
+
+        var request = new AppendEntriesRequest
+        {
+            Term = new Term(3),
+            LeaderId = new NodeId(2),
+            PrevLogIndex = 1,
+            PrevLogTerm = new Term(2),
+            Entries = [],
+            LeaderCommit = 0
+        };
+
+        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+
+        state.CommitIndex.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task AcceptsFirstEntry_WhenPrevLogIndexIsMinusOneAndLogIsEmpty()
+    {
+        var transport = new TestTransport();
+        var state = new State
+        {
+            CurrentTerm = new Term(1),
+        };
+
+        var node = new RaftNode(
+            new NodeId(1),
+            [new NodeId(2)],
+            transport,
+            state,
+            new FixedElectionTimeout(100),
+            new DummyStateMachine());
+
+        var request = new AppendEntriesRequest
+        {
+            Term = new Term(1),
+            LeaderId = new NodeId(2),
+            PrevLogIndex = -1,
+            PrevLogTerm = new Term(0),
+            Entries = [new LogEntry(new Term(1), "init")],
+            LeaderCommit = 0
+        };
+
+        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+
+        state.GetCount().ShouldBe(1);
+        state.GetCommandAtIndex(0).ShouldBe("init");
+    }
+
+
+    [Fact]
+    public async Task RejectsAppendEntries_WhenPrevLogIndexIsBeyondLogLength()
+    {
+        var state = new State
+        {
+            CurrentTerm = new Term(3),
+        };
+        state.AddLogEntry(new Term(1), "a");
+
+        var transport = new TestTransport();
+
+        var node = new RaftNode(
+            new NodeId(1),
+            [new NodeId(2)],
+            transport,
+            state,
+            new FixedElectionTimeout(100),
+            new DummyStateMachine());
+
+        var request = new AppendEntriesRequest
+        {
+            Term = new Term(3),
+            LeaderId = new NodeId(2),
+            PrevLogIndex = 2, // log only has 1 entry
+            PrevLogTerm = new Term(1),
+            Entries = [],
+            LeaderCommit = 0
+        };
+
+        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+
+        var response = transport.Sent[0].Message as AppendEntriesResponse;
+        response!.Success.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task FollowerAppliesCommittedEntries_WhenLeaderCommitAdvances()
+    {
+        var state = new State
+        {
+            CurrentTerm = new Term(3),
+            CommitIndex = 0,
+            LastApplied = 0
+        };
+        state.AddLogEntry(new Term(1), "a");
+        state.AddLogEntry(new Term(2), "b");
+        state.AddLogEntry(new Term(3), "c");
+
+        var transport = new TestTransport();
+
+        var node = new RaftNode(
+            new NodeId(1),
+            [new NodeId(2)],
+            transport,
+            state,
+            new FixedElectionTimeout(100),
+            new DummyStateMachine());
+
+        var request = new AppendEntriesRequest
+        {
+            Term = new Term(3),
+            LeaderId = new NodeId(99),
+            PrevLogIndex = 2,
+            PrevLogTerm = new Term(3),
+            Entries = [],
+            LeaderCommit = 2
+        };
+
+        await node.ReceivePeerMessageAsync(new NodeId(99), request);
+
+        state.CommitIndex.ShouldBe(2);
+        state.LastApplied.ShouldBe(2);
     }
 }

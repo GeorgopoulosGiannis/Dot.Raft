@@ -4,19 +4,7 @@ namespace Dot.Raft.UnitTests.RaftNodeTests;
 
 public class ElectionTests
 {
-    private class FakeTransport(Action<NodeId, object> onSend) : IRaftTransport
-    {
-        public Task SendAsync<T>(NodeId to, T message)
-        {
-            onSend(to, message);
-            return Task.CompletedTask;
-        }
-    }
-
-    private class FixedElectionTimeout(int ticks) : IElectionTimeoutProvider
-    {
-        public int GetTimeoutTicks() => ticks;
-    }
+ 
 
     [Fact]
     public async Task StartsElection_WhenElectionTimeoutExpires()
@@ -25,11 +13,11 @@ public class ElectionTests
         var peerId = new NodeId(2);
         var sentMessagesPair = new List<(NodeId To, object Message)>();
 
-        var transport = new FakeTransport((to, message) => sentMessagesPair.Add((to, message)));
+        var transport = new TestTransportWithCallback((to, message) => sentMessagesPair.Add((to, message)));
         // Always 3 ticks
         var timeoutProvider = new FixedElectionTimeout(3);
 
-        var node = new RaftNode(nodeId, [peerId], transport, timeoutProvider);
+        var node = new RaftNode(nodeId, [peerId], transport, timeoutProvider, new DummyStateMachine());
 
         // Tick 1
         await node.TickAsync();
@@ -43,7 +31,7 @@ public class ElectionTests
 
         sentMessagesPair.Count.ShouldBe(1);
         sentMessagesPair[0].To.ShouldBe(peerId);
-        var request = sentMessagesPair[0].Message as RequestVoteRequest;
+        var request = sentMessagesPair[0].Message as RequestVote;
         request.ShouldNotBeNull();
         request.Term.ShouldBe(new Term(1));
         request.CandidateId.ShouldBe(nodeId);
@@ -56,10 +44,10 @@ public class ElectionTests
         var peerIds = new[] { new NodeId(2), new NodeId(3), new NodeId(4) };
 
 
-        var transport = new FakeTransport((_, _) => { });
+        var transport = new TestTransportWithCallback((_, _) => { });
         var timeoutProvider = new FixedElectionTimeout(1); // 1 tick to trigger immediately
 
-        var node = new RaftNode(nodeId, peerIds.ToList(), transport, timeoutProvider);
+        var node = new RaftNode(nodeId, peerIds.ToList(), transport, timeoutProvider, new DummyStateMachine());
 
         // Trigger election
         await node.TickAsync();
@@ -68,18 +56,16 @@ public class ElectionTests
         var vote1 = new RequestVoteResponse
         {
             Term = new Term(1),
-            ReplierId = new NodeId(2),
             VoteGranted = true,
         };
         var vote2 = new RequestVoteResponse
         {
             Term = new Term(1),
-            ReplierId = new NodeId(3),
             VoteGranted = true,
         };
 
-        await node.ReceiveAsync(vote1);
-        await node.ReceiveAsync(vote2);
+        await node.ReceivePeerMessageAsync(new NodeId(2), vote1);
+        await node.ReceivePeerMessageAsync(new NodeId(3), vote2);
 
         node.Role.ShouldBe(RaftRole.Leader);
     }
@@ -87,31 +73,148 @@ public class ElectionTests
     [Fact]
     public async Task BecomesFollower_WhenNewestTermIsSeen()
     {
-        var nodeId = new NodeId(1);
-        var peerIds = new[] { new NodeId(2), new NodeId(3), new NodeId(4) };
-
-
-        var transport = new FakeTransport((_, _) => { });
-        var timeoutProvider = new FixedElectionTimeout(1);
-
         var node = new RaftNode(
-            nodeId,
-            peerIds.ToList(),
-            transport,
+            new NodeId(1),
+            [new NodeId(2), new NodeId(3), new NodeId(4)],
+            new TestTransportWithCallback((_, _) => { }),
             new State(),
-            timeoutProvider,
-            RaftRole.Candidate);
+            new FixedElectionTimeout(1),
+            new DummyStateMachine());
+        await node.TickAsync();
 
         // Receive vote response with greater term
         var vote1 = new RequestVoteResponse
         {
             Term = new Term(5),
-            ReplierId = new NodeId(2),
             VoteGranted = false,
         };
 
-        await node.ReceiveAsync(vote1);
+        await node.ReceivePeerMessageAsync(new NodeId(2), vote1);
 
         node.Role.ShouldBe(RaftRole.Follower);
+    }
+
+    [Fact]
+    public async Task InitializesLeaderState_WhenBecomingLeader()
+    {
+        var state = new State();
+        state.AddLogEntry(new Term(1), "init");
+
+        var node = new RaftNode(
+            new NodeId(1),
+            [new NodeId(2), new NodeId(3)],
+            new TestTransportWithCallback((_, _) => { }),
+            state,
+            new FixedElectionTimeout(1),
+            new DummyStateMachine());
+
+        // simulate election timeout
+        await node.TickAsync();
+
+        // receive 2 votes (majority of 3)
+        await node.ReceivePeerMessageAsync(new NodeId(2), new RequestVoteResponse
+            { Term = new Term(1), VoteGranted = true });
+        await node.ReceivePeerMessageAsync(new NodeId(3), new RequestVoteResponse
+            { Term = new Term(1), VoteGranted = true });
+
+        node.Role.ShouldBe(RaftRole.Leader);
+        state.NextIndexes.Count.ShouldBe(2);
+        state.MatchIndexes.Count.ShouldBe(2);
+
+        foreach (var nextIndex in state.NextIndexes)
+        {
+            nextIndex.ShouldBe(0); // last log index + 1
+        }
+
+        foreach (var matchIndex in state.MatchIndexes)
+        {
+            matchIndex.ShouldBe(-1);
+        }
+    }
+
+
+    [Fact]
+    public async Task SendsHeartbeats_WhenLeaderTicks()
+    {
+        var state = new State();
+        state.AddLogEntry(new Term(1), "init");
+
+        var sent = new List<(NodeId, object)>();
+        var node = new RaftNode(
+            new NodeId(1),
+            [new NodeId(2), new NodeId(3)],
+            new TestTransportWithCallback((nodeId, message) => { sent.Add((nodeId, message)); }),
+            state,
+            new FixedElectionTimeout(1),
+            new DummyStateMachine());
+
+        // become leader
+        await node.TickAsync();
+        await node.ReceivePeerMessageAsync(new NodeId(2), new RequestVoteResponse
+            { Term = new Term(1), VoteGranted = true });
+        await node.ReceivePeerMessageAsync(new NodeId(3), new RequestVoteResponse
+            { Term = new Term(1), VoteGranted = true });
+
+        sent.Clear();
+
+        // trigger heartbeat
+        await node.TickAsync();
+
+        sent.Count.ShouldBe(2);
+        foreach (var (_, msg) in sent)
+        {
+            msg.ShouldBeOfType<AppendEntriesRequest>();
+            var append = (AppendEntriesRequest)msg;
+
+            append.Entries.Length.ShouldBe(1);
+            append.Term.ShouldBe(new Term(1));
+            append.LeaderId.ShouldBe(new NodeId(1));
+            append.LeaderCommit.ShouldBe(state.CommitIndex);
+
+            append.PrevLogIndex.ShouldBe(0);
+            append.PrevLogTerm.ShouldBe(new Term(1));
+        }
+    }
+
+    [Fact]
+    public async Task FollowerAcceptsHeartbeat_AndUpdatesCommitIndex()
+    {
+        var state = new State
+        {
+            CurrentTerm = new Term(2),
+            CommitIndex = 0,
+        };
+
+        state.AddLogEntry(new Term(1), "a");
+        state.AddLogEntry(new Term(2), "b");
+
+        var sent = new List<(NodeId id, object msg)>();
+        var node = new RaftNode(
+            new NodeId(1),
+            [],
+            new TestTransportWithCallback((nodeId, message) => { sent.Add((nodeId, message)); }),
+            state,
+            new FixedElectionTimeout(1), 
+            new DummyStateMachine());
+
+        var request = new AppendEntriesRequest
+        {
+            Term = new Term(2),
+            LeaderId = new NodeId(99),
+            PrevLogIndex = 1,
+            PrevLogTerm = new Term(2),
+            Entries = [],
+            LeaderCommit = 1
+        };
+
+        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+
+        state.CommitIndex.ShouldBe(1);
+
+        sent.Count.ShouldBe(1);
+        var response = sent[0].msg as AppendEntriesResponse;
+        response.ShouldNotBeNull();
+        response!.Success.ShouldBeTrue();
+        response.Term.ShouldBe(new Term(2));
     }
 }

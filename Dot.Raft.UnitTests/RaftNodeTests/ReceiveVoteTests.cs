@@ -9,7 +9,7 @@ public class ReceiveVoteTests
         public NodeId? SendTo { get; private set; }
         public object? Command { get; private set; }
 
-        public Task SendAsync<T>(NodeId sendTo, T command)
+        public Task SendAsync(NodeId sendTo, object command)
         {
             SendTo = sendTo;
             Command = command;
@@ -31,19 +31,28 @@ public class ReceiveVoteTests
             {
                 CurrentTerm = new Term(0)
             },
-            new RandomizedElectionTimeout(),
-            RaftRole.Leader);
+            new FixedElectionTimeout(1),
+            new DummyStateMachine());
 
-        node.Role.ShouldBe(RaftRole.Leader);
-        var request = new RequestVoteRequest
+        await node.TickAsync();
+
+        await node.ReceivePeerMessageAsync(candidateId, new RequestVoteResponse
         {
             Term = new Term(1),
+            VoteGranted = true
+        });
+
+        node.Role.ShouldBe(RaftRole.Leader);
+
+        var request = new RequestVote
+        {
+            Term = new Term(2),
             CandidateId = candidateId,
             LastLogIndex = 0,
             LastLogTerm = new Term(0)
         };
 
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(candidateId, request);
 
         node.Role.ShouldBe(RaftRole.Follower);
     }
@@ -60,9 +69,10 @@ public class ReceiveVoteTests
             [candidateId],
             transport,
             state,
-            new RandomizedElectionTimeout());
+            new RandomizedElectionTimeout(),
+            new DummyStateMachine());
 
-        var request = new RequestVoteRequest
+        var request = new RequestVote
         {
             Term = new Term(1),
             CandidateId = candidateId,
@@ -70,7 +80,7 @@ public class ReceiveVoteTests
             LastLogTerm = new Term(0)
         };
 
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(candidateId, request);
 
         transport.SendTo.ShouldBe(candidateId);
         var response = transport.Command as RequestVoteResponse;
@@ -83,13 +93,18 @@ public class ReceiveVoteTests
     [Fact]
     public async Task GrantsVote_WhenCandidateTermIsHigher_AndLogUpToDate_AndFirstVote()
     {
-        var nodeId = new NodeId(1);
+        var state = new State { CurrentTerm = new Term(2) };
         var candidateId = new NodeId(2);
         var transport = new FakeTransport();
-        var state = new State { CurrentTerm = new Term(2) };
-        var node = new RaftNode(nodeId, [candidateId], transport, state, new RandomizedElectionTimeout());
+        var node = new RaftNode(
+            new NodeId(1),
+            [candidateId],
+            transport,
+            state,
+            new RandomizedElectionTimeout(),
+            new DummyStateMachine());
 
-        var request = new RequestVoteRequest
+        var request = new RequestVote
         {
             Term = new Term(3),
             CandidateId = candidateId,
@@ -97,7 +112,7 @@ public class ReceiveVoteTests
             LastLogTerm = new Term(0)
         };
 
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(candidateId, request);
 
         var response = transport.Command as RequestVoteResponse;
         response.ShouldNotBeNull();
@@ -123,9 +138,10 @@ public class ReceiveVoteTests
             [candidateId],
             transport,
             state,
-            new RandomizedElectionTimeout());
+            new RandomizedElectionTimeout(),
+            new DummyStateMachine());
 
-        var request = new RequestVoteRequest
+        var request = new RequestVote
         {
             Term = new Term(5),
             CandidateId = candidateId,
@@ -133,7 +149,7 @@ public class ReceiveVoteTests
             LastLogTerm = new Term(0)
         };
 
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(candidateId, request);
 
         var response = transport.Command as RequestVoteResponse;
         response.ShouldNotBeNull();
@@ -156,10 +172,11 @@ public class ReceiveVoteTests
             [candidateId],
             transport,
             state,
-            new RandomizedElectionTimeout());
+            new RandomizedElectionTimeout(), 
+            new DummyStateMachine());
 
 
-        var request = new RequestVoteRequest
+        var request = new RequestVote
         {
             Term = new Term(4),
             CandidateId = candidateId,
@@ -167,7 +184,7 @@ public class ReceiveVoteTests
             LastLogTerm = new Term(0)
         };
 
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(candidateId, request);
 
         var response = transport.Command as RequestVoteResponse;
         response.ShouldNotBeNull();
@@ -195,16 +212,17 @@ public class ReceiveVoteTests
             [candidateId],
             transport,
             state,
-            new RandomizedElectionTimeout());
+            new RandomizedElectionTimeout(), 
+            new DummyStateMachine());
 
-        var request = new RequestVoteRequest
+        var request = new RequestVote
         {
             Term = new Term(5),
             CandidateId = candidateId,
             LastLogIndex = 0,
             LastLogTerm = new Term(0)
         };
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(candidateId, request);
 
         var response = transport.Command as RequestVoteResponse;
         response.ShouldNotBeNull();
@@ -224,17 +242,18 @@ public class ReceiveVoteTests
 
         var state = new State
         {
-            CurrentTerm = new Term(5),
-            LogEntries = [new LogEntry { Term = new Term(5), Command = "set x = 1" }]
+            CurrentTerm = new Term(5)
         };
+        state.AddLogEntry(new Term(5),"set x = 1");
         var node = new RaftNode(
             nodeId,
             [candidateId],
             transport,
             state,
-            new RandomizedElectionTimeout());
+            new RandomizedElectionTimeout(), 
+            new DummyStateMachine());
 
-        var request = new RequestVoteRequest
+        var request = new RequestVote
         {
             Term = new Term(5),
             CandidateId = candidateId,
@@ -242,7 +261,7 @@ public class ReceiveVoteTests
             LastLogTerm = new Term(4) // Candidate term 4 (less than node's term 5)
         };
 
-        await node.ReceiveAsync(request);
+        await node.ReceivePeerMessageAsync(candidateId, request);
 
         var response = transport.Command as RequestVoteResponse;
         response.ShouldNotBeNull();

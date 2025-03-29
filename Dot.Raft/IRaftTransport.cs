@@ -5,5 +5,5 @@ namespace Dot.Raft;
 /// </summary>
 public interface IRaftTransport
 {
-    Task SendAsync<T>(NodeId sendTo, T command);
+    Task SendAsync(NodeId sendTo, object command);
 }
