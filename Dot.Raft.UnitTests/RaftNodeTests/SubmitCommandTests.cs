@@ -28,7 +28,8 @@ public class SubmitCommandTests
             peers,
             transport,
             state,
-            new FixedElectionTimeout(1),
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
         // become leader
@@ -48,8 +49,8 @@ public class SubmitCommandTests
 
         foreach (var sent in transport.Sent)
         {
-            sent.Message.ShouldBeOfType<AppendEntriesRequest>();
-            var request = (AppendEntriesRequest)sent.Message;
+            sent.Message.ShouldBeOfType<AppendEntries>();
+            var request = (AppendEntries)sent.Message;
             request.Entries.Length.ShouldBe(1);
             request.Entries[0].Command.ShouldBe("x");
             request.PrevLogIndex.ShouldBe(0);

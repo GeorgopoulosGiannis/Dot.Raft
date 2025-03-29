@@ -17,7 +17,8 @@ public class AppendEntriesResponseTests
             peers,
             transport,
             state,
-            new FixedElectionTimeout(1),
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(1),
             new DummyStateMachine());
 
         // become leader
@@ -55,7 +56,8 @@ public class AppendEntriesResponseTests
             peers,
             transport,
             state,
-            new FixedElectionTimeout(1),
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(1),
             new DummyStateMachine());
 
         // become leader
@@ -78,5 +80,51 @@ public class AppendEntriesResponseTests
 
         // Commit index should now be advanced to 0
         state.CommitIndex.ShouldBe(0);
+    }
+    
+    
+    [Fact]
+    public async Task RetriesAppendEntriesWhenFollowerRejects()
+    {
+        var leaderId = new NodeId(1);
+        var followerId = new NodeId(2);
+        var transport = new TestTransport();
+
+        var state = new State
+        {
+            CurrentTerm = new Term(1),
+            CommitIndex = 0,
+            LastApplied = -1
+        };
+        state.AddLogEntry(new Term(1), "cmd1");
+
+        var node = new RaftNode(
+            leaderId,
+            [followerId],
+            transport,
+            state,
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(1),
+            new DummyStateMachine());
+        
+        // promote to leader
+        await node.TickAsync();
+        await node.ReceivePeerMessageAsync(followerId, new RequestVoteResponse
+        {
+            VoteGranted = true,
+            Term = new Term(2),
+        });
+        
+        await node.ReceivePeerMessageAsync(followerId, new AppendEntriesResponse
+        {
+            Success = false,
+            Term = new Term(2)
+        });
+
+        var retry = transport.Sent.LastOrDefault(msg => msg.To == followerId && msg.Message is AppendEntries);
+        retry.ShouldNotBeNull();
+        var request = retry.Message as AppendEntries;
+        request!.PrevLogIndex.ShouldBe(0);
+        request.Entries.Length.ShouldBe(1);
     }
 }

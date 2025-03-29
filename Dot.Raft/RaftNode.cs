@@ -2,14 +2,15 @@ namespace Dot.Raft;
 
 public class RaftNode
 {
-    private State State { get; } = new();
-
-    private int _elapsedTicks;
-    private int _electionTimeoutTicks;
     private readonly IRaftTransport _transport;
-    private readonly IElectionTimeoutProvider _electionTimeoutProvider;
-    private readonly IStateMachine _stateMachine;
+
+    private readonly IElectionTimer _electionTimer;
+    private readonly IHeartbeatTimer _heartbeatTimer;
+
     private readonly List<NodeId> _peers;
+    private readonly IStateMachine _stateMachine;
+
+    private State State { get; } = new();
 
     private HashSet<NodeId> _votesReceived = [];
 
@@ -25,16 +26,24 @@ public class RaftNode
     /// <param name="peers">The peers of the RAFT cluster.</param>
     /// <param name="transport">The <see cref="IRaftTransport"/> to use for sending messages to peers.</param>
     /// <param name="state">The <see cref="State"/> to provide instead of the default initial.</param>
-    /// <param name="electionTimeoutProvider">The <see cref="IElectionTimeoutProvider"/> to use in order to get election timeout ticks.</param>
+    /// <param name="electionTimer">The <see cref="IElectionTimer"/> to use in order to determine election timeouts.</param>
+    /// <param name="heartbeatTimer">The <see cref="IHeartbeatTimer"/> to use in order to trigger heartbeat broadcasts.</param>
     /// <param name="stateMachine">The <see cref="IStateMachine"/>That log commands will be applied to.</param>
     public RaftNode(
         NodeId nodeId,
         List<NodeId> peers,
         IRaftTransport transport,
         State state,
-        IElectionTimeoutProvider electionTimeoutProvider,
+        IElectionTimer electionTimer,
+        IHeartbeatTimer heartbeatTimer,
         IStateMachine stateMachine
-    ) : this(nodeId, peers, transport, electionTimeoutProvider, stateMachine)
+    ) : this(
+        nodeId,
+        peers,
+        transport,
+        electionTimer,
+        heartbeatTimer,
+        stateMachine)
     {
         State = state;
     }
@@ -45,20 +54,23 @@ public class RaftNode
     /// <param name="nodeId">The <see cref="NodeId"/> of the current node.</param>
     /// <param name="peers">The peers of the RAFT cluster.</param>
     /// <param name="transport">The <see cref="IRaftTransport"/> to use for sending messages to peers.</param>
-    /// <param name="electionTimeoutProvider">The <see cref="IElectionTimeoutProvider"/> to use in order to get election timeout ticks.</param>
+    /// <param name="electionTimer">The <see cref="IElectionTimer"/> to use in order to determine election timeouts.</param>
+    /// <param name="heartbeatTimer">The <see cref="IHeartbeatTimer"/> to use in order to trigger heartbeat broadcasts.</param>
     /// <param name="stateMachine">The <see cref="IStateMachine"/>That log commands will be applied to.</param>
     public RaftNode(NodeId nodeId,
         List<NodeId> peers,
         IRaftTransport transport,
-        IElectionTimeoutProvider electionTimeoutProvider,
+        IElectionTimer electionTimer,
+        IHeartbeatTimer heartbeatTimer,
         IStateMachine stateMachine)
     {
         _transport = transport;
-        _electionTimeoutProvider = electionTimeoutProvider;
+        _electionTimer = electionTimer;
+        _heartbeatTimer = heartbeatTimer;
         _stateMachine = stateMachine;
         _peers = peers;
         Id = nodeId;
-        ResetElectionTimeout();
+        _electionTimer.Reset();
     }
 
     private NodeId Id { get; }
@@ -66,17 +78,14 @@ public class RaftNode
 
     public async Task TickAsync()
     {
-        // Logic for election timeout, heartbeats, etc. will go here.
-        _elapsedTicks++;
-
-        if (Role is RaftRole.Follower or RaftRole.Candidate && _elapsedTicks >= _electionTimeoutTicks)
+        if (Role is RaftRole.Follower or RaftRole.Candidate && _electionTimer.ShouldTriggerElection())
         {
             await StartElectionAsync();
         }
 
-        if (Role is RaftRole.Leader)
+        if (Role is RaftRole.Leader && _heartbeatTimer.ShouldSendHeartbeat())
         {
-            await SendHeartbeatsAsync();
+            await BroadcastHeartbeatAsync();
         }
 
         await ApplyCommitedEntries();
@@ -87,10 +96,9 @@ public class RaftNode
         Role = RaftRole.Candidate;
         State.CurrentTerm++;
         State.VotedFor = Id;
-        _elapsedTicks = 0;
         _votesReceived = [Id];
 
-        ResetElectionTimeout();
+        _electionTimer.Reset();
 
         var lastLogIndex = State.GetLastLogIndex();
         var lastLogTerm = State.GetLastLogTerm();
@@ -103,10 +111,8 @@ public class RaftNode
             LastLogTerm = lastLogTerm
         };
 
-        foreach (var peer in _peers)
-        {
-            await _transport.SendAsync(peer, request);
-        }
+        await Task.WhenAll(
+            _peers.Select(peer => _transport.SendAsync(peer, request)));
     }
 
     /// <summary>
@@ -121,8 +127,11 @@ public class RaftNode
     /// - Validate that its log matches up to PrevLogIndex<br/>
     /// - Accept leader authority and update commit index<br/>
     /// </summary>
-    private async Task SendHeartbeatsAsync()
+    private async Task BroadcastHeartbeatAsync()
     {
+        _heartbeatTimer.Reset();
+        
+        var heartbeatTasks = new List<Task>();
         for (var i = 0; i < _peers.Count; i++)
         {
             var peer = _peers[i];
@@ -131,22 +140,23 @@ public class RaftNode
 
             var prevLogTerm = State.GetTermAtIndex(prevLogIndex);
 
-            await _transport.SendAsync(peer, new AppendEntriesRequest
+            heartbeatTasks.Add(_transport.SendAsync(peer, new AppendEntries
             {
                 LeaderId = Id,
                 Term = State.CurrentTerm,
                 PrevLogIndex = prevLogIndex,
                 PrevLogTerm = prevLogTerm,
                 LeaderCommit = State.CommitIndex,
-                Entries = State.GetLogEntries(nextIndex).Select(x => new LogEntry(x.Term, x.Command)).ToArray(),
-            });
+                Entries = State
+                    .GetLogEntries(nextIndex)
+                    .Select(x => new LogEntry(x.Term, x.Command))
+                    .ToArray(),
+            }));
         }
+
+        await Task.WhenAll(heartbeatTasks);
     }
 
-    private void ResetElectionTimeout()
-    {
-        _electionTimeoutTicks = _electionTimeoutProvider.GetTimeoutTicks();
-    }
 
     public async Task ReceivePeerMessageAsync(NodeId nodeId, object message)
     {
@@ -154,9 +164,9 @@ public class RaftNode
         {
             RequestVote request => ReceiveAsync(request),
             RequestVoteResponse response => ReceiveAsync(nodeId, response),
-            AppendEntriesRequest request => ReceiveAsync(request),
+            AppendEntries request => ReceiveAsync(request),
             AppendEntriesResponse response => ReceiveAsync(nodeId, response),
-            _ => Task.CompletedTask,
+            _ => throw new ArgumentOutOfRangeException(nameof(message), message, "Unknown message type"),
         };
         await task;
     }
@@ -165,7 +175,7 @@ public class RaftNode
     /// Handles a <see cref="RequestVote"/>.
     /// The receiver will:
     /// 1. Reply false if term &lt; currentTerm
-    /// 2. Grant vote,if votedFor is null or candidateId, and candidate's log is at least as up-to-date as receiver's log. 
+    /// 2. Grant vote, if votedFor is null or candidateId, and candidate's log is at least as up-to-date as receiver's log. 
     /// </summary>
     /// <param name="requestVote"><see cref="RequestVote"/>.</param>
     private async Task ReceiveAsync(RequestVote requestVote)
@@ -179,10 +189,12 @@ public class RaftNode
             });
             return;
         }
-
+        
+        
         Role = RaftRole.Follower;
         State.CurrentTerm = requestVote.Term;
-
+        _electionTimer.Reset();
+        
         var alreadyVoted = State.VotedFor is not null
                            && State.VotedFor != requestVote.CandidateId;
 
@@ -227,31 +239,33 @@ public class RaftNode
             return Task.CompletedTask;
         }
 
-        if (response.VoteGranted)
+        if (!response.VoteGranted)
         {
-            _votesReceived.Add(nodeId);
-            var majority = (_peers.Count + 1) / 2 + 1;
+            return Task.CompletedTask;
+        }
+        _votesReceived.Add(nodeId);
+        var majority = (_peers.Count + 1) / 2 + 1;
 
-            if (_votesReceived.Count >= majority)
-            {
-                Role = RaftRole.Leader;
-
-                State.NextIndexes.Clear();
-                State.MatchIndexes.Clear();
-
-                var nextIndex = Math.Max(State.GetLastLogIndex(), 0);
-                for (var i = 0; i < _peers.Count; i++)
-                {
-                    State.NextIndexes.Add(nextIndex);
-                    State.MatchIndexes.Add(-1);
-                }
-            }
+        if (_votesReceived.Count < majority)
+        {
+            return Task.CompletedTask;
+        }
+        
+        Role = RaftRole.Leader;
+        State.NextIndexes.Clear();
+        State.MatchIndexes.Clear();
+                
+        var nextIndex = Math.Max(State.GetLastLogIndex(), 0);
+        for (var i = 0; i < _peers.Count; i++)
+        {
+            State.NextIndexes.Add(nextIndex);
+            State.MatchIndexes.Add(-1);
         }
 
         return Task.CompletedTask;
     }
 
-    private async Task ReceiveAsync(AppendEntriesRequest request)
+    private async Task ReceiveAsync(AppendEntries request)
     {
         if (request.Term < State.CurrentTerm)
         {
@@ -269,8 +283,8 @@ public class RaftNode
             State.CurrentTerm = request.Term;
             State.VotedFor = null;
         }
-
-        _elapsedTicks = 0;
+        
+        _electionTimer.Reset();
 
         // Reply false if log doesn't contain an entry at prevLogIndex
         // whose term matches prevLogTerm
@@ -325,7 +339,7 @@ public class RaftNode
     }
 
     /// <summary>
-    /// Handles the response from a <see cref="AppendEntriesRequest"/>.
+    /// Handles the response from a <see cref="AppendEntries"/>.
     /// </summary>
     /// <param name="nodeId">The <see cref="NodeId"/> sending the response.</param>
     /// <param name="response">The <see cref="AppendEntriesResponse"/>.</param>
@@ -368,9 +382,24 @@ public class RaftNode
         }
         else
         {
-            // Decrement next index and retry
             State.NextIndexes[peerIndex] = Math.Max(0, State.NextIndexes[peerIndex] - 1);
-            // Optionally resend AppendEntries here (can be covered later)
+
+            var nextIndex = State.NextIndexes[peerIndex];
+            var prevLogIndex = Math.Max(nextIndex - 1, 0);
+            var prevLogTerm = State.GetTermAtIndex(prevLogIndex);
+
+            await _transport.SendAsync(nodeId, new AppendEntries
+            {
+                LeaderId = Id,
+                Term = State.CurrentTerm,
+                PrevLogIndex = prevLogIndex,
+                PrevLogTerm = prevLogTerm,
+                Entries = State
+                    .GetLogEntries(nextIndex)
+                    .Select(entry => new LogEntry(entry.Term, entry.Command))
+                    .ToArray(),
+                LeaderCommit = State.CommitIndex
+            });
         }
     }
 
@@ -388,7 +417,7 @@ public class RaftNode
             var nextIndex = State.NextIndexes[i];
             var prevLogIndex = Math.Max(nextIndex - 1, 0);
 
-            var request = new AppendEntriesRequest
+            var request = new AppendEntries
             {
                 LeaderId = Id,
                 Term = State.CurrentTerm,

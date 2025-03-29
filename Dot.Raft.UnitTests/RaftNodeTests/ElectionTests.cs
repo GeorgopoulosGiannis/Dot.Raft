@@ -4,8 +4,6 @@ namespace Dot.Raft.UnitTests.RaftNodeTests;
 
 public class ElectionTests
 {
- 
-
     [Fact]
     public async Task StartsElection_WhenElectionTimeoutExpires()
     {
@@ -15,9 +13,14 @@ public class ElectionTests
 
         var transport = new TestTransportWithCallback((to, message) => sentMessagesPair.Add((to, message)));
         // Always 3 ticks
-        var timeoutProvider = new FixedElectionTimeout(3);
 
-        var node = new RaftNode(nodeId, [peerId], transport, timeoutProvider, new DummyStateMachine());
+        var node = new RaftNode(
+            nodeId,
+            [peerId],
+            transport,
+            new LogicalElectionTimer(3),
+            new LogicalHeartbeatTimer(10),
+            new DummyStateMachine());
 
         // Tick 1
         await node.TickAsync();
@@ -40,14 +43,15 @@ public class ElectionTests
     [Fact]
     public async Task BecomesLeader_WhenMajorityVotesAreReceived()
     {
-        var nodeId = new NodeId(1);
-        var peerIds = new[] { new NodeId(2), new NodeId(3), new NodeId(4) };
-
-
-        var transport = new TestTransportWithCallback((_, _) => { });
-        var timeoutProvider = new FixedElectionTimeout(1); // 1 tick to trigger immediately
-
-        var node = new RaftNode(nodeId, peerIds.ToList(), transport, timeoutProvider, new DummyStateMachine());
+        var node = new RaftNode(
+            new NodeId(1),
+            [
+                new NodeId(2), new NodeId(3), new NodeId(4)
+            ],
+            new TestTransportWithCallback((_, _) => { }),
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
+            new DummyStateMachine());
 
         // Trigger election
         await node.TickAsync();
@@ -75,10 +79,13 @@ public class ElectionTests
     {
         var node = new RaftNode(
             new NodeId(1),
-            [new NodeId(2), new NodeId(3), new NodeId(4)],
+            [
+                new NodeId(2), new NodeId(3), new NodeId(4)
+            ],
             new TestTransportWithCallback((_, _) => { }),
             new State(),
-            new FixedElectionTimeout(1),
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
         await node.TickAsync();
 
@@ -102,10 +109,13 @@ public class ElectionTests
 
         var node = new RaftNode(
             new NodeId(1),
-            [new NodeId(2), new NodeId(3)],
+            [
+                new NodeId(2), new NodeId(3)
+            ],
             new TestTransportWithCallback((_, _) => { }),
             state,
-            new FixedElectionTimeout(1),
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
         // simulate election timeout
@@ -142,10 +152,13 @@ public class ElectionTests
         var sent = new List<(NodeId, object)>();
         var node = new RaftNode(
             new NodeId(1),
-            [new NodeId(2), new NodeId(3)],
+            [
+                new NodeId(2), new NodeId(3)
+            ],
             new TestTransportWithCallback((nodeId, message) => { sent.Add((nodeId, message)); }),
             state,
-            new FixedElectionTimeout(1),
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(1),
             new DummyStateMachine());
 
         // become leader
@@ -163,8 +176,8 @@ public class ElectionTests
         sent.Count.ShouldBe(2);
         foreach (var (_, msg) in sent)
         {
-            msg.ShouldBeOfType<AppendEntriesRequest>();
-            var append = (AppendEntriesRequest)msg;
+            msg.ShouldBeOfType<AppendEntries>();
+            var append = (AppendEntries)msg;
 
             append.Entries.Length.ShouldBe(1);
             append.Term.ShouldBe(new Term(1));
@@ -194,10 +207,11 @@ public class ElectionTests
             [],
             new TestTransportWithCallback((nodeId, message) => { sent.Add((nodeId, message)); }),
             state,
-            new FixedElectionTimeout(1), 
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntriesRequest
+        var request = new AppendEntries
         {
             Term = new Term(2),
             LeaderId = new NodeId(99),

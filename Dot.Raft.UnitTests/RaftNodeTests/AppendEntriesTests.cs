@@ -14,10 +14,11 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100),
+            new LogicalElectionTimer(100),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntriesRequest
+        var request = new AppendEntries
         {
             Term = new Term(4),
             LeaderId = new NodeId(2),
@@ -50,10 +51,11 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100),
+            new LogicalElectionTimer(100),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntriesRequest
+        var request = new AppendEntries
         {
             Term = new Term(5),
             LeaderId = new NodeId(2),
@@ -81,10 +83,11 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100),
+            new LogicalElectionTimer(100),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntriesRequest
+        var request = new AppendEntries
         {
             Term = new Term(3),
             LeaderId = new NodeId(2),
@@ -121,10 +124,11 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100),
+            new LogicalElectionTimer(100),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntriesRequest
+        var request = new AppendEntries
         {
             Term = new Term(5),
             LeaderId = new NodeId(2),
@@ -161,10 +165,11 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100),
+            new LogicalElectionTimer(100),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntriesRequest
+        var request = new AppendEntries
         {
             Term = new Term(5),
             LeaderId = new NodeId(2),
@@ -197,10 +202,11 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100),
+            new LogicalElectionTimer(100),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntriesRequest
+        var request = new AppendEntries
         {
             Term = new Term(5),
             LeaderId = new NodeId(2),
@@ -233,10 +239,11 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100),
+            new LogicalElectionTimer(100),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntriesRequest
+        var request = new AppendEntries
         {
             Term = new Term(3),
             LeaderId = new NodeId(2),
@@ -265,10 +272,11 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100),
+            new LogicalElectionTimer(100),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntriesRequest
+        var request = new AppendEntries
         {
             Term = new Term(1),
             LeaderId = new NodeId(2),
@@ -301,10 +309,11 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100),
+            new LogicalElectionTimer(100),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntriesRequest
+        var request = new AppendEntries
         {
             Term = new Term(3),
             LeaderId = new NodeId(2),
@@ -340,10 +349,11 @@ public class AppendEntriesTests
             [new NodeId(2)],
             transport,
             state,
-            new FixedElectionTimeout(100),
+            new LogicalElectionTimer(100),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntriesRequest
+        var request = new AppendEntries
         {
             Term = new Term(3),
             LeaderId = new NodeId(99),

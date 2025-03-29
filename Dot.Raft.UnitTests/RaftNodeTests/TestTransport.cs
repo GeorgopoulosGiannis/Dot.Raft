@@ -2,7 +2,7 @@ namespace Dot.Raft.UnitTests.RaftNodeTests;
 
 public class TestTransport : IRaftTransport
 {
-    public List<SentMessage> Sent = new();
+    public List<SentMessage> Sent = [];
 
     public Task SendAsync(NodeId to, object message)
     {

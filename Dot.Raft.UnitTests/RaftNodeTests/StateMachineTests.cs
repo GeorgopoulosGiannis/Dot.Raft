@@ -19,7 +19,14 @@ public class RaftNodeStateMachineTests
         state.AddLogEntry(new Term(1), "B");
         state.AddLogEntry(new Term(1), "C");
 
-        var node = new RaftNode(new NodeId(1), new(), transport, state, new FixedElectionTimeout(5), stateMachine);
+        var node = new RaftNode(
+            new NodeId(1),
+            [],
+            transport,
+            state,
+            new LogicalElectionTimer(5),
+            new LogicalHeartbeatTimer(10),
+            stateMachine);
         await node.TickAsync();
 
         stateMachine.AppliedCommands.ShouldBe(new[] { "A", "B", "C" });
@@ -40,7 +47,13 @@ public class RaftNodeStateMachineTests
         state.AddLogEntry(new Term(1), "2");
         state.AddLogEntry(new Term(1), "3");
 
-        var node = new RaftNode(new NodeId(1), new(), new TestTransport(), state, new FixedElectionTimeout(5),
+        var node = new RaftNode(
+            new NodeId(1),
+            [],
+            new TestTransport(),
+            state,
+            new LogicalElectionTimer(5),
+            new LogicalHeartbeatTimer(10),
             stateMachine);
         await node.TickAsync();
 
@@ -62,7 +75,13 @@ public class RaftNodeStateMachineTests
         state.AddLogEntry(new Term(1), "Y");
         state.AddLogEntry(new Term(1), "Z");
 
-        var node = new RaftNode(new NodeId(1), new(), new TestTransport(), state, new FixedElectionTimeout(5),
+        var node = new RaftNode(
+            new NodeId(1),
+            [],
+            new TestTransport(),
+            state,
+            new LogicalElectionTimer(5),
+            new LogicalHeartbeatTimer(10),
             stateMachine);
         await node.TickAsync();
 
@@ -82,7 +101,13 @@ public class RaftNodeStateMachineTests
         };
         state.AddLogEntry(new Term(1), "Only");
 
-        var node = new RaftNode(new NodeId(1), new(), new TestTransport(), state, new FixedElectionTimeout(5),
+        var node = new RaftNode(
+            new NodeId(1),
+            [],
+            new TestTransport(),
+            state,
+            new LogicalElectionTimer(5),
+            new LogicalHeartbeatTimer(10),
             stateMachine);
         await node.TickAsync();
 
@@ -104,7 +129,13 @@ public class RaftNodeStateMachineTests
         state.AddLogEntry(new Term(1), "second");
         state.AddLogEntry(new Term(1), "third");
 
-        var node = new RaftNode(new NodeId(1), new(), new TestTransport(), state, new FixedElectionTimeout(5),
+        var node = new RaftNode(
+            new NodeId(1),
+            [],
+            new TestTransport(),
+            state,
+            new LogicalElectionTimer(5),
+            new LogicalHeartbeatTimer(10),
             stateMachine);
         await node.TickAsync();
 

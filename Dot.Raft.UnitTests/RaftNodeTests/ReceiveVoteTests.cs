@@ -31,7 +31,8 @@ public class ReceiveVoteTests
             {
                 CurrentTerm = new Term(0)
             },
-            new FixedElectionTimeout(1),
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
         await node.TickAsync();
@@ -69,7 +70,8 @@ public class ReceiveVoteTests
             [candidateId],
             transport,
             state,
-            new RandomizedElectionTimeout(),
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
         var request = new RequestVote
@@ -101,7 +103,8 @@ public class ReceiveVoteTests
             [candidateId],
             transport,
             state,
-            new RandomizedElectionTimeout(),
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
         var request = new RequestVote
@@ -138,7 +141,8 @@ public class ReceiveVoteTests
             [candidateId],
             transport,
             state,
-            new RandomizedElectionTimeout(),
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
         var request = new RequestVote
@@ -172,7 +176,8 @@ public class ReceiveVoteTests
             [candidateId],
             transport,
             state,
-            new RandomizedElectionTimeout(), 
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
 
@@ -212,7 +217,8 @@ public class ReceiveVoteTests
             [candidateId],
             transport,
             state,
-            new RandomizedElectionTimeout(), 
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
         var request = new RequestVote
@@ -250,7 +256,8 @@ public class ReceiveVoteTests
             [candidateId],
             transport,
             state,
-            new RandomizedElectionTimeout(), 
+            new LogicalElectionTimer(1),
+            new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
         var request = new RequestVote

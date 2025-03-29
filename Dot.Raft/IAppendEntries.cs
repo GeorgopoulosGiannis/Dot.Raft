@@ -19,13 +19,13 @@ public interface IAppendEntries
     /// 4. Append any new entries not already in the log if leaderCommit &gt; commitIndex, set commitIndex = min(leaderCommit,index of last new entry)
     /// </summary>
     /// <returns><see cref="AppendEntriesResponse"/>.</returns>
-    Task AppendEntriesAsync(AppendEntriesRequest request);
+    Task AppendEntriesAsync(AppendEntries request);
 }
 
 /// <summary>
 /// The arguments for the <see cref="IAppendEntries.AppendEntriesAsync"/>.
 /// </summary>
-public record AppendEntriesRequest
+public record AppendEntries
 {
     /// <summary>
     /// Leader's term.
@@ -43,7 +43,7 @@ public record AppendEntriesRequest
     public required int PrevLogIndex { get; init; }
 
     /// <summary>
-    /// Term of <see cref="AppendEntriesRequest.PrevLogIndex"/> entry.
+    /// Term of <see cref="AppendEntries.PrevLogIndex"/> entry.
     /// </summary>
     public required Term PrevLogTerm { get; init; }
 
