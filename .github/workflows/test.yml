@@ -1,12 +1,10 @@
-name: Run Tests
-
+name: 'Run Tests'
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,7 +17,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.x'
-        
+
       - name: Build Dot.Raft.TestHarness.Tests
         run: dotnet build ./tests/Dot.Raft.TestHarness.Tests/Dot.Raft.TestHarness.Tests.csproj
 
@@ -32,35 +30,10 @@ jobs:
       - name: Run Dot.Raft.Tests
         run: dotnet test ./tests/Dot.Raft.Tests --collect:"XPlat Code Coverage" --results-directory TestResults --logger:"trx;LogFileName=raft-tests.trx" --logger:"console;verbosity=detailed"
       
-      - name: Test Report
-        uses: dorny/test-reporter@v1
-        if: always()
+      - uses: actions/upload-artifact@v4  
+        if: success() || failure()       
         with:
-          name: Tests Report
-          path: "**/*.trx"
-          reporter: dotnet-trx
-          fail-on-error: true
+          name: test-results
+          path: TestResults/**.trx
+          
 
-      - name: ReportGenerator
-        uses: danielpalme/ReportGenerator-GitHub-Action@5.2.0
-        with:
-          reports: '${{ github.workspace }}/TestResults/**/*.cobertura.xml'
-          targetdir: '${{ github.workspace }}/coveragereport'
-          reporttypes: 'MarkdownSummaryGithub'
-
-      - name: Upload coverage into summary
-        run: cat $GITHUB_WORKSPACE/coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
-
-      - name: Add Coverage PR Comment
-        uses: marocchino/sticky-pull-request-comment@v2
-        if: github.event_name == 'pull_request'
-        with:
-          header: dot-raft-tests
-          recreate: true
-          path: '${{ github.workspace }}/coveragereport/SummaryGithub.md'
-
-      - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
-        with:
-          name: code-coverage-report
-          path: '${{ github.workspace }}/TestResults/*.cobertura.xml'
