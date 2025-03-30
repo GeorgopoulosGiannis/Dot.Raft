@@ -12,8 +12,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.Testing.Utilities"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionItems", "SolutionItems", "{6B6560E2-5F5A-41FC-B4E3-C56F486DE448}"
 	ProjectSection(SolutionItems) = preProject
-		SolutionItems\README.md = SolutionItems\README.md
-		SolutionItems\GitVersion.yml = SolutionItems\GitVersion.yml
+		README.md = README.md
+		GitVersion.yml = GitVersion.yml
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.TestHarness", "src\Dot.Raft.TestHarness\Dot.Raft.TestHarness.csproj", "{AB086384-4DB5-4F60-AADD-6EC463549119}"
