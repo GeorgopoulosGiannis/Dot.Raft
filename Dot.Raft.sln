@@ -13,11 +13,17 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionItems", "SolutionItems", "{6B6560E2-5F5A-41FC-B4E3-C56F486DE448}"
 	ProjectSection(SolutionItems) = preProject
 		SolutionItems\README.md = SolutionItems\README.md
+		SolutionItems\GitVersion.yml = SolutionItems\GitVersion.yml
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.TestHarness", "src\Dot.Raft.TestHarness\Dot.Raft.TestHarness.csproj", "{AB086384-4DB5-4F60-AADD-6EC463549119}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.TestHarness.Tests", "tests\Dot.Raft.TestHarness.Tests\Dot.Raft.TestHarness.Tests.csproj", "{26389B28-E0CB-47E5-9693-1CE4FE24BF6E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github/workflows", ".github/workflows", "{398E4E4D-9707-4EE6-9B06-48CA6142357F}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\publish.yml = .github\workflows\publish.yml
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -21,11 +21,11 @@ It aims to provide a maintainable and verifiable foundation for distributed syst
 
 The repository is organized into the following projects:
 
-- `src/Dot.Raft` — the core Raft implementation
-- `src/Dot.Raft.TestHarness` — tools for simulating and testing clusters
-- `tests/Dot.Raft.Tests` — unit tests for internal components
-- `tests/Dot.Raft.TestHarness.Tests` — high-level integration tests using the test harness
-- `tests/Dot.Raft.Testing.Utilities` — common testing utilities shared across test projects
+- `Dot.Raft` — the core Raft implementation
+- `Dot.Raft.TestHarness` — tools for simulating and testing clusters
+- `Dot.Raft.Tests` — unit tests for internal components
+- `Dot.Raft.TestHarness.Tests` — high-level integration tests using the test harness
+- `Dot.Raft.Testing.Utilities` — common testing utilities shared across test projects
 
 ---
 
@@ -111,7 +111,7 @@ public class StatePrinter : IRaftNodeVisitor
 
 ## Project Structure
 
-```bash
+```text
 src/
 ├── Dot.Raft                  # Core Raft logic and abstractions
 ├── Dot.Raft.TestHarness      # Cluster simulation with in-memory transport
