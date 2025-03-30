@@ -12,20 +12,16 @@ public class ClusterTests(ITestOutputHelper output)
         var cluster = ClusterFactory.Create(3);
 
         await cluster.TickUntilLeaderElected();
-
-        var leader = cluster.GetLeader();
-
         var commands = new List<object>()
         {
             "hello",
         };
         foreach (var command in commands)
         {
-            await leader.SubmitCommandAsync(command);
+            await cluster.SubmitToLeaderAsync(command);
         }
-
-
-        await cluster.TickAllAsync(100);
+        
+        await cluster.TickAllAsync(50);
 
         cluster.VisitNodes(new StateMachineVisitor(commands));
         cluster.VisitNodes(new DebugVisitor(output));
