@@ -1,4 +1,4 @@
-using Dot.Raft.Testing.Utilities;
+using Dot.Raft.TestHarness.Tests.ScenarioBuilding;
 using Shouldly;
 using Xunit.Abstractions;
 
@@ -9,60 +9,53 @@ public class ClusterTests(ITestOutputHelper output)
     [Fact]
     public async Task Cluster_ReplicatesAndAppliesCommand()
     {
-        var cluster = ClusterFactory.Create(3);
-
-        await cluster.TickUntilLeaderElected();
-        var commands = new List<object>()
-        {
-            "hello",
-        };
-        foreach (var command in commands)
-        {
-            await cluster.SubmitToLeaderAsync(command);
-        }
-        
-        await cluster.TickAllAsync(50);
-
-        cluster.VisitNodes(new StateMachineVisitor(commands));
-        cluster.VisitNodes(new DebugVisitor(output));
+        await ScenarioBuilder.Build(3)
+            .Then(x => x.TickUntilLeaderElected())
+            .Then(x => x.SubmitCommand("x"))
+            .Then(x => x.Tick(50))
+            .Then(x => x.AssertAllApplied())
+            .Then(x => x.PrintClusterState(output));
     }
-}
 
-public class StateMachineVisitor(List<object> expectedCommands) : IRaftNodeVisitor
-{
-    public void Visit<TStateMachine>(
-        NodeId id,
-        Term term,
-        RaftRole role,
-        State state,
-        TStateMachine stateMachine)
-        where TStateMachine : IStateMachine
+    [Fact]
+    public async Task Partition_And_Heal_Still_Replicates()
     {
-        var applied = (stateMachine as DummyStateMachine)?.AppliedCommands;
-        applied.ShouldBe(expectedCommands);
+        await ScenarioBuilder.Build(3)
+            .Then(builder =>
+            {
+                var node1 = builder.NodeIds[0];
+                var node2 = builder.NodeIds[1];
+
+                return builder
+                    .Partition(node1, node2)
+                    .Then(x => x.Tick(10))
+                    .Then(x => x.Heal(node1, node2));
+            })
+            .Then(x => x.TickUntilLeaderElected())
+            .Then(x => x.SubmitCommand("recover"))
+            .Then(x => x.Tick(50))
+            .Then(x => x.AssertAllApplied())
+            .Then(x => x.PrintClusterState(output));
     }
-}
 
-public class DebugVisitor(ITestOutputHelper output) : IRaftNodeVisitor
-{
-    public void Visit<TStateMachine>(NodeId id, Term term, RaftRole role, State state, TStateMachine sm)
-        where TStateMachine : IStateMachine
+    [Fact]
+    public async Task Partition_DisruptsLeadership()
     {
-        var logStr = state
-            .GetLogEntries()
-            .Select((e, i) => $"[{i}:{e.Term.Value}]{e.Command}").ToList();
+        var builder = await ScenarioBuilder.Build(3)
+            .Then(x => x.TickUntilLeaderElected())
+            .Then(x => x.AssertSingleLeader());
 
-        var log = logStr.Count > 0 ? string.Join(", ", logStr) : "(empty)";
+        var leaderId = builder.Cluster.GetLeader().Id;
+        var isolatedId = builder.NodeIds.First(id => id != leaderId); // pick someone to isolate from leader
 
-        output.WriteLine($"Node Id: {id.Id} | Term: {term.Value} | Role: {role}");
-        output.WriteLine($"  Log: {log}");
-        output.WriteLine($"  CommitIndex: {state.CommitIndex}, LastApplied: {state.LastApplied}");
-
-        if (sm is DummyStateMachine dsm)
-        {
-            output.WriteLine($"  Applied: {string.Join(", ", dsm.AppliedCommands)}");
-        }
-
-        output.WriteLine("");
+        await builder
+            .Partition(leaderId, isolatedId)
+            .Tick(20)
+            .Then(x =>
+            {
+                var leaderCount = x.Cluster.GetAllLeaders().Count;
+                leaderCount.ShouldBeInRange(0, 2); // multiple leaders or no leader = valid
+                return x;
+            });
     }
 }
