@@ -1,9 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
     </PropertyGroup>
@@ -19,9 +20,10 @@
     <ItemGroup>
         <Using Include="Xunit"/>
     </ItemGroup>
-    
+
     <ItemGroup>
-        <ProjectReference Include="..\Dot.Raft.Testing.Utilities\Dot.Raft.Testing.Utilities.csproj" />
-        <ProjectReference Include="..\Dot.Raft\Dot.Raft.csproj" />
+      <ProjectReference Include="..\Dot.Raft.Testing.Utilities\Dot.Raft.Testing.Utilities.csproj" />
+      <ProjectReference Include="..\..\src\Dot.Raft\Dot.Raft.csproj" />
     </ItemGroup>
+
 </Project>
