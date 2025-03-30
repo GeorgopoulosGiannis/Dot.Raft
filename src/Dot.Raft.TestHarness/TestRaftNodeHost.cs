@@ -17,7 +17,6 @@ public class TestRaftNodeHost(IRaftNode node)
         while (_inbox.Count > 0)
         {
             var msg = _inbox.Dequeue();
-            // In a real setup we might track sender; for now assume from any node
             await Node.ReceivePeerMessageAsync(msg);
         }
     }

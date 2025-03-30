@@ -118,30 +118,10 @@ public class RaftNode : IRaftNode
     {
         if (Role != RaftRole.Leader)
             return;
-
-
+        
         State.AddLogEntry(State.CurrentTerm, command);
 
-        for (var i = 0; i < _peers.Count; i++)
-        {
-            var peer = _peers[i];
-            var nextIndex = State.NextIndexes[i];
-            var prevLogIndex = nextIndex - 1;
-
-            var request = new AppendEntries
-            {
-                LeaderId = Id,
-                Term = State.CurrentTerm,
-                PrevLogIndex = prevLogIndex,
-                PrevLogTerm = State.GetTermAtIndex(prevLogIndex),
-                Entries = State
-                    .GetLogEntries(nextIndex)
-                    .Select(pair => new LogEntry(pair.Term, pair.Command))
-                    .ToArray(),
-                LeaderCommit = State.CommitIndex
-            };
-            await _transport.SendAsync(peer, request);
-        }
+        await BroadcastHeartbeatAsync();
     }
 
     /// <summary>
@@ -197,32 +177,36 @@ public class RaftNode : IRaftNode
     {
         _heartbeatTimer.Reset();
 
-        var heartbeatTasks = new List<Task>();
-        for (var i = 0; i < _peers.Count; i++)
-        {
-            var peer = _peers[i];
-            var nextIndex = State.NextIndexes[i];
-            var prevLogIndex = nextIndex - 1;
-
-            var prevLogTerm = State.GetTermAtIndex(prevLogIndex);
-
-            var request = new AppendEntries
-            {
-                LeaderId = Id,
-                Term = State.CurrentTerm,
-                PrevLogIndex = prevLogIndex,
-                PrevLogTerm = prevLogTerm,
-                LeaderCommit = State.CommitIndex,
-                Entries = State
-                    .GetLogEntries(nextIndex)
-                    .Select(x => new LogEntry(x.Term, x.Command))
-                    .ToArray(),
-            };
-
-            heartbeatTasks.Add(_transport.SendAsync(peer, request));
-        }
+        var heartbeatTasks = _peers
+            .Select(SendAppendEntriesAsync)
+            .ToList();
 
         await Task.WhenAll(heartbeatTasks);
+    }
+
+    private async Task SendAppendEntriesAsync(NodeId nodeId)
+    {
+        var peerIndex = _peers.IndexOf(nodeId);
+        var nextIndex = State.NextIndexes[peerIndex];
+        var prevLogIndex = nextIndex - 1;
+        var prevLogTerm = State.GetTermAtIndex(prevLogIndex);
+
+        var entries = State
+            .GetLogEntries(nextIndex)
+            .Select(x => new LogEntry(x.Term, x.Command))
+            .ToArray();
+
+        var request = new AppendEntries
+        {
+            LeaderId = Id,
+            Term = State.CurrentTerm,
+            PrevLogIndex = prevLogIndex,
+            PrevLogTerm = prevLogTerm,
+            LeaderCommit = State.CommitIndex,
+            Entries = entries,
+        };
+
+        await _transport.SendAsync(nodeId, request);
     }
 
 
@@ -394,7 +378,7 @@ public class RaftNode : IRaftNode
                 // Conflict: truncate and break
                 State.RemoveEntriesFrom(index);
             }
-
+            index++;
             State.AddLogEntry(entry.Term, entry.Command);
         }
 

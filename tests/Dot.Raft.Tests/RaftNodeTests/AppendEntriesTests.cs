@@ -1,7 +1,7 @@
 using Dot.Raft.Testing.Utilities;
 using Shouldly;
 
-namespace Dot.Raft.UnitTests.RaftNodeTests;
+namespace Dot.Raft.Tests.RaftNodeTests;
 
 public class AppendEntriesTests
 {
@@ -129,7 +129,8 @@ public class AppendEntriesTests
             new LogicalHeartbeatTimer(10),
             new DummyStateMachine());
 
-        var request = new AppendEntries
+
+        await node.ReceivePeerMessageAsync(new AppendEntries
         {
             Term = new Term(5),
             LeaderId = new NodeId(2),
@@ -141,9 +142,7 @@ public class AppendEntriesTests
                 new LogEntry(new Term(3), "new3")
             ],
             LeaderCommit = 0
-        };
-
-        await node.ReceivePeerMessageAsync(request);
+        });
 
         state.GetCount().ShouldBe(3);
         state.GetCommandAtIndex(1).ShouldBe("new2");

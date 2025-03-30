@@ -1,4 +1,4 @@
-namespace Dot.Raft.UnitTests.RaftNodeTests;
+namespace Dot.Raft.Tests.RaftNodeTests;
 
 public class TestTransport : IRaftTransport
 {

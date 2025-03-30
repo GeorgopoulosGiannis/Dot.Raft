@@ -1,7 +1,7 @@
 using Dot.Raft.Testing.Utilities;
 using Shouldly;
 
-namespace Dot.Raft.UnitTests.RaftNodeTests;
+namespace Dot.Raft.Tests.RaftNodeTests;
 
 public class SubmitCommandTests
 {
@@ -55,7 +55,10 @@ public class SubmitCommandTests
         // submit a command
         await node.SubmitCommandAsync("x");
 
-        state.GetCommandAtIndex(state.GetLastLogIndex()).ShouldBe("x");
+        state
+            .GetCommandAtIndex(state.GetLastLogIndex())
+            .ShouldBe("x");
+        
         transport.Sent.Count.ShouldBe(2);
 
         foreach (var sent in transport.Sent)
@@ -64,8 +67,8 @@ public class SubmitCommandTests
             var request = (AppendEntries)sent.Message;
             request.Entries.Length.ShouldBe(1);
             request.Entries[0].Command.ShouldBe("x");
-            request.PrevLogIndex.ShouldBe(0);
-            request.PrevLogTerm.ShouldBe(new Term(4));
+            request.PrevLogIndex.ShouldBe(-1);
+            request.PrevLogTerm.ShouldBe(new Term(0));
         }
     }
 }

@@ -6,16 +6,18 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{25EA7B3B-FB2
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{9B1F523B-3AE2-4D67-A1C9-BB0A550882EA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.UnitTests", "tests\Dot.Raft.UnitTests\Dot.Raft.UnitTests.csproj", "{310FF5A4-D6CE-44D8-8D3F-D97CA9C3D7D9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.Tests", "tests\Dot.Raft.Tests\Dot.Raft.Tests.csproj", "{310FF5A4-D6CE-44D8-8D3F-D97CA9C3D7D9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.Testing.Utilities", "tests\Dot.Raft.Testing.Utilities\Dot.Raft.Testing.Utilities.csproj", "{DC089AAE-0219-43B7-886B-B24F022D77D4}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.TestHarness", "tests\Dot.Raft.TestHarness\Dot.Raft.TestHarness.csproj", "{0595B787-5F78-41E5-9550-3FC82414AE60}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionItems", "SolutionItems", "{6B6560E2-5F5A-41FC-B4E3-C56F486DE448}"
 	ProjectSection(SolutionItems) = preProject
 		SolutionItems\README.md = SolutionItems\README.md
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.TestHarness", "src\Dot.Raft.TestHarness\Dot.Raft.TestHarness.csproj", "{AB086384-4DB5-4F60-AADD-6EC463549119}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dot.Raft.TestHarness.Tests", "tests\Dot.Raft.TestHarness.Tests\Dot.Raft.TestHarness.Tests.csproj", "{26389B28-E0CB-47E5-9693-1CE4FE24BF6E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -35,15 +37,20 @@ Global
 		{DC089AAE-0219-43B7-886B-B24F022D77D4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DC089AAE-0219-43B7-886B-B24F022D77D4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DC089AAE-0219-43B7-886B-B24F022D77D4}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0595B787-5F78-41E5-9550-3FC82414AE60}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0595B787-5F78-41E5-9550-3FC82414AE60}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0595B787-5F78-41E5-9550-3FC82414AE60}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0595B787-5F78-41E5-9550-3FC82414AE60}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AB086384-4DB5-4F60-AADD-6EC463549119}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AB086384-4DB5-4F60-AADD-6EC463549119}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AB086384-4DB5-4F60-AADD-6EC463549119}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AB086384-4DB5-4F60-AADD-6EC463549119}.Release|Any CPU.Build.0 = Release|Any CPU
+		{26389B28-E0CB-47E5-9693-1CE4FE24BF6E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{26389B28-E0CB-47E5-9693-1CE4FE24BF6E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{26389B28-E0CB-47E5-9693-1CE4FE24BF6E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{26389B28-E0CB-47E5-9693-1CE4FE24BF6E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{03D08DB5-8C0C-4F6C-86AB-4F480BF46BE0} = {25EA7B3B-FB27-44D2-97C7-6ACECD81D475}
 		{310FF5A4-D6CE-44D8-8D3F-D97CA9C3D7D9} = {9B1F523B-3AE2-4D67-A1C9-BB0A550882EA}
 		{DC089AAE-0219-43B7-886B-B24F022D77D4} = {9B1F523B-3AE2-4D67-A1C9-BB0A550882EA}
-		{0595B787-5F78-41E5-9550-3FC82414AE60} = {9B1F523B-3AE2-4D67-A1C9-BB0A550882EA}
+		{AB086384-4DB5-4F60-AADD-6EC463549119} = {25EA7B3B-FB27-44D2-97C7-6ACECD81D475}
+		{26389B28-E0CB-47E5-9693-1CE4FE24BF6E} = {9B1F523B-3AE2-4D67-A1C9-BB0A550882EA}
 	EndGlobalSection
 EndGlobal

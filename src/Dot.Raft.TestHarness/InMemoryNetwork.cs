@@ -9,7 +9,6 @@ public class InMemoryNetwork : IRaftTransport
         _nodes[id] = host;
     }
 
-
     public Task SendAsync(NodeId to, object message)
     {
         if (_nodes.TryGetValue(to, out var host))

@@ -1,7 +1,7 @@
 using Dot.Raft.Testing.Utilities;
 using Shouldly;
 
-namespace Dot.Raft.UnitTests.RaftNodeTests;
+namespace Dot.Raft.Tests.RaftNodeTests;
 
 public class ReceiveVoteTests
 {
