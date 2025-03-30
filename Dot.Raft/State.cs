@@ -108,7 +108,7 @@ public class State
     /// <returns>The <see cref="Term"/>.</returns>
     public Term GetTermAtIndex(int index)
     {
-        return index > LogEntries.Count - 1 ? new Term(0) : LogEntries[index].Term;
+        return LogEntries.ElementAtOrDefault(index)?.Term ?? new Term(0);
     }
 
     /// <summary>

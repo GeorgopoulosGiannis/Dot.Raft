@@ -28,7 +28,7 @@ public class AppendEntriesTests
             LeaderCommit = 0
         };
 
-        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+        await node.ReceivePeerMessageAsync(request);
 
         var response = transport.Sent[0].Message as AppendEntriesResponse;
         response.ShouldNotBeNull();
@@ -65,7 +65,7 @@ public class AppendEntriesTests
             LeaderCommit = 0
         };
 
-        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+        await node.ReceivePeerMessageAsync(request);
 
         var response = transport.Sent[0].Message as AppendEntriesResponse;
         response.ShouldNotBeNull();
@@ -97,7 +97,7 @@ public class AppendEntriesTests
             LeaderCommit = 0
         };
 
-        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+        await node.ReceivePeerMessageAsync(request);
 
         state.CurrentTerm.ShouldBe(new Term(3));
         state.GetCount().ShouldBe(1);
@@ -142,7 +142,7 @@ public class AppendEntriesTests
             LeaderCommit = 0
         };
 
-        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+        await node.ReceivePeerMessageAsync(request);
 
         state.GetCount().ShouldBe(3);
         state.GetCommandAtIndex(1).ShouldBe("new2");
@@ -179,7 +179,7 @@ public class AppendEntriesTests
             LeaderCommit = 0
         };
 
-        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+        await node.ReceivePeerMessageAsync(request);
 
         state.GetCount().ShouldBe(2);
         state.GetCommandAtIndex(1).ShouldBe("set y");
@@ -216,7 +216,7 @@ public class AppendEntriesTests
             LeaderCommit = 10
         };
 
-        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+        await node.ReceivePeerMessageAsync(request);
 
         state.CommitIndex.ShouldBe(1);
     }
@@ -253,7 +253,7 @@ public class AppendEntriesTests
             LeaderCommit = 0
         };
 
-        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+        await node.ReceivePeerMessageAsync(request);
 
         state.CommitIndex.ShouldBe(1);
     }
@@ -286,7 +286,7 @@ public class AppendEntriesTests
             LeaderCommit = 0
         };
 
-        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+        await node.ReceivePeerMessageAsync(request);
 
         state.GetCount().ShouldBe(1);
         state.GetCommandAtIndex(0).ShouldBe("init");
@@ -323,7 +323,7 @@ public class AppendEntriesTests
             LeaderCommit = 0
         };
 
-        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+        await node.ReceivePeerMessageAsync(request);
 
         var response = transport.Sent[0].Message as AppendEntriesResponse;
         response!.Success.ShouldBeFalse();
@@ -363,7 +363,7 @@ public class AppendEntriesTests
             LeaderCommit = 2
         };
 
-        await node.ReceivePeerMessageAsync(new NodeId(99), request);
+        await node.ReceivePeerMessageAsync(request);
 
         state.CommitIndex.ShouldBe(2);
         state.LastApplied.ShouldBe(2);

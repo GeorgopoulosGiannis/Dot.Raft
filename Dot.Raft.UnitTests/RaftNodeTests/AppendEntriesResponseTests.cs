@@ -9,7 +9,6 @@ public class AppendEntriesResponseTests
     {
         var peers = new List<NodeId> { new NodeId(2), new NodeId(3) };
         var state = new State { CurrentTerm = new Term(5) };
-        state.AddLogEntry(new Term(5), "set x");
 
         var transport = new TestTransport();
         var node = new RaftNode(
@@ -24,20 +23,28 @@ public class AppendEntriesResponseTests
         // become leader
         await node.TickAsync();
 
-        await node.ReceivePeerMessageAsync(peers[1],
-            new RequestVoteResponse { Term = new Term(6), VoteGranted = true });
-
+        await node.ReceivePeerMessageAsync(
+            new RequestVoteResponse
+            {
+                VoteGranted = true,
+                ReplierId = peers[1],
+                Term = new Term(6),
+            });
+        
+        state.AddLogEntry(new Term(5), "set x"); // log index - 0 
+        
         // Start append entries
         await node.TickAsync();
 
         // follower 2 confirms replication of entry at index 0
         var response = new AppendEntriesResponse
         {
+            Success = true,
+            ReplierId = peers[1],
             Term = new Term(6),
-            Success = true
         };
 
-        await node.ReceivePeerMessageAsync(peers[1], response);
+        await node.ReceivePeerMessageAsync(response);
 
         var followerIndex = peers.IndexOf(peers[1]);
         state.MatchIndexes[followerIndex].ShouldBe(0);
@@ -62,17 +69,28 @@ public class AppendEntriesResponseTests
 
         // become leader
         await node.TickAsync();
-        await node.ReceivePeerMessageAsync(peers[0],
-            new RequestVoteResponse { Term = new Term(6), VoteGranted = true });
-        await node.ReceivePeerMessageAsync(peers[1],
-            new RequestVoteResponse { Term = new Term(6), VoteGranted = true });
+        await node.ReceivePeerMessageAsync(
+            new RequestVoteResponse
+            {
+                ReplierId = peers[0],
+                VoteGranted = true,
+                Term = new Term(6),
+            });
+        await node.ReceivePeerMessageAsync(
+            new RequestVoteResponse
+            {
+                ReplierId = peers[1],
+                Term = new Term(6),
+                VoteGranted = true
+            });
 
         // submit a new command (term 6)
         await node.SubmitCommandAsync("set x");
 
         // follower 2 confirms replication of entry at index 0
-        await node.ReceivePeerMessageAsync(peers[0], new AppendEntriesResponse
+        await node.ReceivePeerMessageAsync(new AppendEntriesResponse
         {
+            ReplierId = peers[0],
             Term = new Term(6),
             Success = true
         });
@@ -81,8 +99,8 @@ public class AppendEntriesResponseTests
         // Commit index should now be advanced to 0
         state.CommitIndex.ShouldBe(0);
     }
-    
-    
+
+
     [Fact]
     public async Task RetriesAppendEntriesWhenFollowerRejects()
     {
@@ -106,17 +124,19 @@ public class AppendEntriesResponseTests
             new LogicalElectionTimer(1),
             new LogicalHeartbeatTimer(1),
             new DummyStateMachine());
-        
+
         // promote to leader
         await node.TickAsync();
-        await node.ReceivePeerMessageAsync(followerId, new RequestVoteResponse
+        await node.ReceivePeerMessageAsync(new RequestVoteResponse
         {
+            ReplierId = followerId,
             VoteGranted = true,
             Term = new Term(2),
         });
-        
-        await node.ReceivePeerMessageAsync(followerId, new AppendEntriesResponse
+
+        await node.ReceivePeerMessageAsync(new AppendEntriesResponse
         {
+            ReplierId = followerId,
             Success = false,
             Term = new Term(2)
         });

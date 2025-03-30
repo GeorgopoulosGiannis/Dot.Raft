@@ -34,10 +34,20 @@ public class SubmitCommandTests
 
         // become leader
         await node.TickAsync();
-        await node.ReceivePeerMessageAsync(peers[0],
-            new RequestVoteResponse { Term = new Term(4), VoteGranted = true });
-        await node.ReceivePeerMessageAsync(peers[1],
-            new RequestVoteResponse { Term = new Term(4), VoteGranted = true });
+        await node.ReceivePeerMessageAsync(
+            new RequestVoteResponse
+            {
+                ReplierId = peers[0],
+                Term = new Term(4),
+                VoteGranted = true
+            });
+        await node.ReceivePeerMessageAsync(
+            new RequestVoteResponse
+            {
+                ReplierId = peers[1],
+                Term = new Term(4),
+                VoteGranted = true
+            });
 
         transport.Sent.Clear();
 

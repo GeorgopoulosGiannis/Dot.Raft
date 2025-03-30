@@ -74,4 +74,9 @@ public record AppendEntriesResponse
     /// currentTerm, for leader to update itself.
     /// </summary>
     public Term Term { get; init; }
+    
+    /// <summary>
+    /// The <see cref="NodeId"/> of the node sending the reply.
+    /// </summary>
+    public required NodeId ReplierId { get; init; }
 }

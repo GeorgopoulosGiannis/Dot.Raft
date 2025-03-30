@@ -100,14 +100,14 @@ public class RaftNode : IRaftNode
     }
 
     /// <inheritdoc />
-    public async Task ReceivePeerMessageAsync(NodeId nodeId, object message)
+    public async Task ReceivePeerMessageAsync(object message)
     {
         var task = message switch
         {
             RequestVote request => ReceiveAsync(request),
-            RequestVoteResponse response => ReceiveAsync(nodeId, response),
+            RequestVoteResponse response => ReceiveAsync(response),
             AppendEntries request => ReceiveAsync(request),
-            AppendEntriesResponse response => ReceiveAsync(nodeId, response),
+            AppendEntriesResponse response => ReceiveAsync(response),
             _ => throw new ArgumentOutOfRangeException(nameof(message), message, "Unknown message type"),
         };
         await task;
@@ -126,7 +126,7 @@ public class RaftNode : IRaftNode
         {
             var peer = _peers[i];
             var nextIndex = State.NextIndexes[i];
-            var prevLogIndex = Math.Max(nextIndex - 1, 0);
+            var prevLogIndex = nextIndex - 1;
 
             var request = new AppendEntries
             {
@@ -134,15 +134,25 @@ public class RaftNode : IRaftNode
                 Term = State.CurrentTerm,
                 PrevLogIndex = prevLogIndex,
                 PrevLogTerm = State.GetTermAtIndex(prevLogIndex),
-                Entries = State.GetLogEntries(nextIndex).Select(pair => new LogEntry(pair.Term, pair.Command))
+                Entries = State
+                    .GetLogEntries(nextIndex)
+                    .Select(pair => new LogEntry(pair.Term, pair.Command))
                     .ToArray(),
                 LeaderCommit = State.CommitIndex
             };
-
             await _transport.SendAsync(peer, request);
         }
     }
-    
+
+    /// <summary>
+    /// Accepts a visitor that can inspect or interact with this Raft node's internal state.
+    /// </summary>
+    /// <param name="visitor">The visitor that will access this node's state.</param>
+    public void Accept(IRaftNodeVisitor visitor)
+    {
+        visitor.Visit(Id, State.CurrentTerm, Role, State, StateMachine);
+    }
+
     /// <summary>
     /// Broadcasts <see cref="RequestVote"/> requests and
     /// sets the state for a <see cref="RaftRole.Candidate"/> node.
@@ -192,11 +202,11 @@ public class RaftNode : IRaftNode
         {
             var peer = _peers[i];
             var nextIndex = State.NextIndexes[i];
-            var prevLogIndex = Math.Max(nextIndex - 1, 0);
+            var prevLogIndex = nextIndex - 1;
 
             var prevLogTerm = State.GetTermAtIndex(prevLogIndex);
 
-            heartbeatTasks.Add(_transport.SendAsync(peer, new AppendEntries
+            var request = new AppendEntries
             {
                 LeaderId = Id,
                 Term = State.CurrentTerm,
@@ -207,7 +217,9 @@ public class RaftNode : IRaftNode
                     .GetLogEntries(nextIndex)
                     .Select(x => new LogEntry(x.Term, x.Command))
                     .ToArray(),
-            }));
+            };
+
+            heartbeatTasks.Add(_transport.SendAsync(peer, request));
         }
 
         await Task.WhenAll(heartbeatTasks);
@@ -227,6 +239,7 @@ public class RaftNode : IRaftNode
         {
             await _transport.SendAsync(requestVote.CandidateId, new RequestVoteResponse
             {
+                ReplierId = Id,
                 Term = State.CurrentTerm,
                 VoteGranted = false,
             });
@@ -253,6 +266,7 @@ public class RaftNode : IRaftNode
 
         await _transport.SendAsync(requestVote.CandidateId, new RequestVoteResponse
         {
+            ReplierId = Id,
             Term = State.CurrentTerm,
             VoteGranted = shouldGrantVote,
         });
@@ -261,9 +275,8 @@ public class RaftNode : IRaftNode
     /// <summary>
     /// Invoked to handle a <see cref="RequestVoteResponse"/>.
     /// </summary>
-    /// <param name="nodeId"></param>
     /// <param name="response"></param>
-    private Task ReceiveAsync(NodeId nodeId, RequestVoteResponse response)
+    private Task ReceiveAsync(RequestVoteResponse response)
     {
         // response term was greater than anything seen, convert to follower
         if (response.Term > State.CurrentTerm)
@@ -286,7 +299,7 @@ public class RaftNode : IRaftNode
             return Task.CompletedTask;
         }
 
-        _votesReceived.Add(nodeId);
+        _votesReceived.Add(response.ReplierId);
         var majority = (_peers.Count + 1) / 2 + 1;
 
         if (_votesReceived.Count < majority)
@@ -298,7 +311,7 @@ public class RaftNode : IRaftNode
         State.NextIndexes.Clear();
         State.MatchIndexes.Clear();
 
-        var nextIndex = Math.Max(State.GetLastLogIndex(), 0);
+        var nextIndex = State.GetLastLogIndex() + 1;
         for (var i = 0; i < _peers.Count; i++)
         {
             State.NextIndexes.Add(nextIndex);
@@ -307,7 +320,7 @@ public class RaftNode : IRaftNode
 
         return Task.CompletedTask;
     }
-    
+
     /// <summary>
     /// Handles the <see cref="AppendEntries"/> request.
     /// </summary>
@@ -318,6 +331,7 @@ public class RaftNode : IRaftNode
         {
             await _transport.SendAsync(request.LeaderId, new AppendEntriesResponse
             {
+                ReplierId = Id,
                 Term = State.CurrentTerm,
                 Success = false,
             });
@@ -339,6 +353,7 @@ public class RaftNode : IRaftNode
         {
             await _transport.SendAsync(request.LeaderId, new AppendEntriesResponse
             {
+                ReplierId = Id,
                 Term = State.CurrentTerm,
                 Success = false,
             });
@@ -368,18 +383,31 @@ public class RaftNode : IRaftNode
         for (; entryIdx < request.Entries.Length; entryIdx++)
         {
             var entry = request.Entries[entryIdx];
+            if (index < State.GetCount())
+            {
+                // Already exists — skip if terms match
+                if (State.GetTermAtIndex(index) == request.Entries[entryIdx].Term)
+                {
+                    continue;
+                }
+
+                // Conflict: truncate and break
+                State.RemoveEntriesFrom(index);
+            }
+
             State.AddLogEntry(entry.Term, entry.Command);
         }
 
         // Update commit index
         if (request.LeaderCommit > State.CommitIndex)
         {
-            State.CommitIndex = Math.Min(request.LeaderCommit, State.GetLastLogIndex());
+            State.CommitIndex = Math.Max(Math.Min(request.LeaderCommit, State.GetLastLogIndex()), 0);
             await ApplyCommitedEntries();
         }
 
         await _transport.SendAsync(request.LeaderId, new AppendEntriesResponse
         {
+            ReplierId = Id,
             Term = State.CurrentTerm,
             Success = true,
         });
@@ -388,9 +416,8 @@ public class RaftNode : IRaftNode
     /// <summary>
     /// Handles the response from a <see cref="AppendEntries"/>.
     /// </summary>
-    /// <param name="nodeId">The <see cref="NodeId"/> sending the response.</param>
     /// <param name="response">The <see cref="AppendEntriesResponse"/>.</param>
-    private async Task ReceiveAsync(NodeId nodeId, AppendEntriesResponse response)
+    private async Task ReceiveAsync(AppendEntriesResponse response)
     {
         if (response.Term > State.CurrentTerm)
         {
@@ -406,7 +433,7 @@ public class RaftNode : IRaftNode
             return;
         }
 
-        var peerIndex = _peers.IndexOf(nodeId);
+        var peerIndex = _peers.IndexOf(response.ReplierId);
         if (peerIndex == -1)
         {
             return;
@@ -414,9 +441,14 @@ public class RaftNode : IRaftNode
 
         if (response.Success)
         {
-            State.MatchIndexes[peerIndex] = State.NextIndexes[peerIndex];
-            State.NextIndexes[peerIndex] = State.MatchIndexes[peerIndex] + 1;
+            if (State.NextIndexes[peerIndex] <= State.GetLastLogIndex())
+            {
+                // safe to assume entries were appended
+                State.MatchIndexes[peerIndex] = State.NextIndexes[peerIndex];
+                State.NextIndexes[peerIndex] = State.MatchIndexes[peerIndex] + 1;
+            }
 
+            // Recalculate commit index regardless — heartbeat success still confirms logs are consistent
             var matchIndexes = State.MatchIndexes.Append(State.GetLastLogIndex()).OrderByDescending(x => x).ToList();
             var majorityIndex = matchIndexes[(matchIndexes.Count - 1) / 2];
 
@@ -435,7 +467,7 @@ public class RaftNode : IRaftNode
             var prevLogIndex = Math.Max(nextIndex - 1, 0);
             var prevLogTerm = State.GetTermAtIndex(prevLogIndex);
 
-            await _transport.SendAsync(nodeId, new AppendEntries
+            await _transport.SendAsync(response.ReplierId, new AppendEntries
             {
                 LeaderId = Id,
                 Term = State.CurrentTerm,

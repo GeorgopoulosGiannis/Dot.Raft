@@ -59,17 +59,19 @@ public class ElectionTests
         // Simulate receiving votes from two peers
         var vote1 = new RequestVoteResponse
         {
+            ReplierId = new NodeId(2),
             Term = new Term(1),
             VoteGranted = true,
         };
         var vote2 = new RequestVoteResponse
         {
+            ReplierId = new NodeId(3),
             Term = new Term(1),
             VoteGranted = true,
         };
 
-        await node.ReceivePeerMessageAsync(new NodeId(2), vote1);
-        await node.ReceivePeerMessageAsync(new NodeId(3), vote2);
+        await node.ReceivePeerMessageAsync(vote1);
+        await node.ReceivePeerMessageAsync(vote2);
 
         node.Role.ShouldBe(RaftRole.Leader);
     }
@@ -92,11 +94,12 @@ public class ElectionTests
         // Receive vote response with greater term
         var vote1 = new RequestVoteResponse
         {
+            ReplierId = new NodeId(2),
             Term = new Term(5),
             VoteGranted = false,
         };
 
-        await node.ReceivePeerMessageAsync(new NodeId(2), vote1);
+        await node.ReceivePeerMessageAsync(vote1);
 
         node.Role.ShouldBe(RaftRole.Follower);
     }
@@ -122,10 +125,18 @@ public class ElectionTests
         await node.TickAsync();
 
         // receive 2 votes (majority of 3)
-        await node.ReceivePeerMessageAsync(new NodeId(2), new RequestVoteResponse
-            { Term = new Term(1), VoteGranted = true });
-        await node.ReceivePeerMessageAsync(new NodeId(3), new RequestVoteResponse
-            { Term = new Term(1), VoteGranted = true });
+        await node.ReceivePeerMessageAsync(new RequestVoteResponse
+        {
+            ReplierId = new NodeId(2),
+            Term = new Term(1),
+            VoteGranted = true
+        });
+        await node.ReceivePeerMessageAsync(new RequestVoteResponse
+        {
+            ReplierId = new NodeId(3),
+            Term = new Term(1),
+            VoteGranted = true
+        });
 
         node.Role.ShouldBe(RaftRole.Leader);
         state.NextIndexes.Count.ShouldBe(2);
@@ -133,7 +144,7 @@ public class ElectionTests
 
         foreach (var nextIndex in state.NextIndexes)
         {
-            nextIndex.ShouldBe(0); // last log index + 1
+            nextIndex.ShouldBe(1); // last log index + 1
         }
 
         foreach (var matchIndex in state.MatchIndexes)
@@ -163,10 +174,18 @@ public class ElectionTests
 
         // become leader
         await node.TickAsync();
-        await node.ReceivePeerMessageAsync(new NodeId(2), new RequestVoteResponse
-            { Term = new Term(1), VoteGranted = true });
-        await node.ReceivePeerMessageAsync(new NodeId(3), new RequestVoteResponse
-            { Term = new Term(1), VoteGranted = true });
+        await node.ReceivePeerMessageAsync(new RequestVoteResponse
+        {
+            ReplierId = new NodeId(2),
+            Term = new Term(1),
+            VoteGranted = true
+        });
+        await node.ReceivePeerMessageAsync(new RequestVoteResponse
+        {
+            ReplierId = new NodeId(3),
+            Term = new Term(1),
+            VoteGranted = true
+        });
 
         sent.Clear();
 
@@ -179,7 +198,7 @@ public class ElectionTests
             msg.ShouldBeOfType<AppendEntries>();
             var append = (AppendEntries)msg;
 
-            append.Entries.Length.ShouldBe(1);
+            append.Entries.Length.ShouldBe(0);
             append.Term.ShouldBe(new Term(1));
             append.LeaderId.ShouldBe(new NodeId(1));
             append.LeaderCommit.ShouldBe(state.CommitIndex);
@@ -221,14 +240,14 @@ public class ElectionTests
             LeaderCommit = 1
         };
 
-        await node.ReceivePeerMessageAsync(request.LeaderId, request);
+        await node.ReceivePeerMessageAsync(request);
 
         state.CommitIndex.ShouldBe(1);
 
         sent.Count.ShouldBe(1);
         var response = sent[0].msg as AppendEntriesResponse;
         response.ShouldNotBeNull();
-        response!.Success.ShouldBeTrue();
+        response.Success.ShouldBeTrue();
         response.Term.ShouldBe(new Term(2));
     }
 }

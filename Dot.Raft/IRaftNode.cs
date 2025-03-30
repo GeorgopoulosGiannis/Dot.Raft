@@ -36,10 +36,9 @@ public interface IRaftNode
     /// <summary>
     /// Handles a message received from another node in the cluster.
     /// </summary>
-    /// <param name="sender">The identifier of the node that sent the message.</param>
     /// <param name="message">The message object, which could be a Raft RPC (e.g., AppendEntries, RequestVote).</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    Task ReceivePeerMessageAsync(NodeId sender, object message);
+    Task ReceivePeerMessageAsync(object message);
 
     /// <summary>
     /// Submits a command to the Raft log. If the node is the leader, the command will be replicated to followers.
@@ -48,4 +47,6 @@ public interface IRaftNode
     /// <param name="command">The command to submit to the replicated log.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task SubmitCommandAsync(object command);
+    
+    void Accept(IRaftNodeVisitor visitor);
 }
