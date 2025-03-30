@@ -117,8 +117,10 @@ public class RaftNode : IRaftNode
     public async Task SubmitCommandAsync(object command)
     {
         if (Role != RaftRole.Leader)
+        {
             return;
-        
+        }
+
         State.AddLogEntry(State.CurrentTerm, command);
 
         await BroadcastHeartbeatAsync();
@@ -214,7 +216,7 @@ public class RaftNode : IRaftNode
     /// Handles a <see cref="RequestVote"/>.
     /// The receiver will:
     /// 1. Reply false if term &lt; currentTerm
-    /// 2. Grant vote, if votedFor is null or candidateId, and candidate's log is at least as up-to-date as receiver's log. 
+    /// 2. Grant vote, if votedFor is null or candidateId, and candidate's log is at least as up-to-date as receiver's log.
     /// </summary>
     /// <param name="requestVote"><see cref="RequestVote"/>.</param>
     private async Task ReceiveAsync(RequestVote requestVote)

@@ -10,7 +10,7 @@ public class State
     /// <summary>
     /// Latest term server has seen (initialized to 0 on first boot, increases monotonically).
     /// </summary>
-    public Term CurrentTerm { get; set; } = default;
+    public Term CurrentTerm { get; set; }
 
     /// <summary>
     /// CandidateId that received vote in current term (or null if none).
@@ -57,7 +57,9 @@ public class State
     public bool HasMatchingEntry(int index, Term term)
     {
         if (index < 0 || index >= LogEntries.Count)
+        {
             return false;
+        }
 
         return LogEntries[index].Term == term;
     }
@@ -66,7 +68,7 @@ public class State
     /// <summary>
     /// Log entries; Each entry contains command for state machine,
     /// and term when entry was received by leader.
-    /// Paper states that starting index is 1 but we keep it 0 based.
+    /// Paper states that starting index is 1 but, we keep it 0 based.
     /// </summary>
     private List<LogEntry> LogEntries { get; init; } = [];
 
@@ -124,7 +126,7 @@ public class State
     }
 
     /// <summary>
-    /// Returns an enumerable of log entries as tuples containing the <see cref="Term"/> and the associated command,
+    /// Returns an enumerable, of log entries as tuples containing the <see cref="Term"/> and the associated command,
     /// starting after the specified index.
     /// </summary>
     /// <param name="fromIndex">The zero-based index to start retrieving entries from. Entries before this index are skipped.</param>
