@@ -1,12 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
+        <Version>0.0.1</Version>
         <Authors>Ioannis Georgopoulos</Authors>
         <PackageId>Dot.Raft</PackageId>
         <Description>A testable, pluggable .NET implementation of the Raft consensus algorithm.</Description>
         <PackageTags>raft;consensus;distributed-systems;replication;cluster</PackageTags>
         <RepositoryUrl>https://github.com/GeorgopoulosGiannis/dot.raft</RepositoryUrl>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -14,4 +16,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
+    <ItemGroup>
+        <None Include="..\..\SolutionItems\README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
 </Project>
