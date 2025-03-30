@@ -22,6 +22,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\Dot.Raft.Testing.Utilities\Dot.Raft.Testing.Utilities.csproj" />
       <ProjectReference Include="..\Dot.Raft\Dot.Raft.csproj" />
     </ItemGroup>
 

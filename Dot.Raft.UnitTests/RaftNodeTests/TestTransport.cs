@@ -2,7 +2,7 @@ namespace Dot.Raft.UnitTests.RaftNodeTests;
 
 public class TestTransport : IRaftTransport
 {
-    public List<SentMessage> Sent = [];
+    public readonly List<SentMessage> Sent = [];
 
     public Task SendAsync(NodeId to, object message)
     {
@@ -12,7 +12,6 @@ public class TestTransport : IRaftTransport
 }
 
 public record SentMessage(NodeId To, object Message);
-
 
 public class TestTransportWithCallback(Action<NodeId, object> onSend) : IRaftTransport
 {

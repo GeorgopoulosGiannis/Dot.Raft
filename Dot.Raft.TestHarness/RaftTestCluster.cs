@@ -1,4 +1,4 @@
-using Dot.Raft.UnitTests.RaftNodeTests;
+using Dot.Raft.Testing.Utilities;
 using Shouldly;
 using Xunit.Abstractions;
 
@@ -19,8 +19,8 @@ public class RaftTestCluster
                 .Select(n => new NodeId(n))
                 .ToList();
 
-            var electionTimer = new RandomizedLogicalElectionTimer(i);
-            var heartbeatTimer = new RandomizedLogicalHeartbeatTimer(i);
+            var electionTimer = new LogicalElectionTimer(5 + i);
+            var heartbeatTimer = new LogicalHeartbeatTimer(2 + i);
             var stateMachine = new DummyStateMachine();
 
             var node = new RaftNode(

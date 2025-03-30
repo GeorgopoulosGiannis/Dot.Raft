@@ -1,4 +1,4 @@
-using Dot.Raft.UnitTests.RaftNodeTests;
+using Dot.Raft.Testing.Utilities;
 using Xunit.Abstractions;
 
 namespace Dot.Raft.TestHarness;

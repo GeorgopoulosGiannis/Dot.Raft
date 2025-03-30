@@ -1,4 +1,4 @@
-namespace Dot.Raft.UnitTests.RaftNodeTests;
+namespace Dot.Raft.Testing.Utilities;
 
 public class DummyStateMachine : IStateMachine
 {

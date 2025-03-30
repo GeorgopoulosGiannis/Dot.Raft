@@ -1,3 +1,4 @@
+using Dot.Raft.Testing.Utilities;
 using Shouldly;
 
 namespace Dot.Raft.UnitTests.RaftNodeTests;
