@@ -94,7 +94,7 @@ public class AppendEntriesTests
             LeaderId = new NodeId(2),
             PrevLogIndex = -1,
             PrevLogTerm = new Term(0),
-            Entries = [new LogEntry(new Term(3), "set x")],
+            Entries = [new AppendEntries.LogEntry(new Term(3), "set x")],
             LeaderCommit = 0
         };
 
@@ -138,8 +138,8 @@ public class AppendEntriesTests
             PrevLogTerm = new Term(1),
             Entries =
             [
-                new LogEntry(new Term(3), "new2"),
-                new LogEntry(new Term(3), "new3")
+                new AppendEntries.LogEntry(new Term(3), "new2"),
+                new AppendEntries.LogEntry(new Term(3), "new3")
             ],
             LeaderCommit = 0
         });
@@ -175,7 +175,7 @@ public class AppendEntriesTests
             LeaderId = new NodeId(2),
             PrevLogIndex = 0,
             PrevLogTerm = new Term(1),
-            Entries = [new LogEntry(new Term(5), "set y")],
+            Entries = [new AppendEntries.LogEntry(new Term(5), "set y")],
             LeaderCommit = 0
         };
 
@@ -282,7 +282,7 @@ public class AppendEntriesTests
             LeaderId = new NodeId(2),
             PrevLogIndex = -1,
             PrevLogTerm = new Term(0),
-            Entries = [new LogEntry(new Term(1), "init")],
+            Entries = [new AppendEntries.LogEntry(new Term(1), "init")],
             LeaderCommit = 0
         };
 

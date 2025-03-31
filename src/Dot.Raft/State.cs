@@ -31,7 +31,6 @@ public class State
             return true;
         }
 
-
         var lastLocalLogTerm = LogEntries[^1].Term;
         var lastLocalLogIndex = LogEntries.Count - 1;
 
@@ -64,14 +63,12 @@ public class State
         return LogEntries[index].Term == term;
     }
 
-
     /// <summary>
     /// Log entries; Each entry contains command for state machine,
     /// and term when entry was received by leader.
     /// Paper states that starting index is 1 but, we keep it 0 based.
     /// </summary>
     private List<LogEntry> LogEntries { get; init; } = [];
-
 
     /// <summary>
     /// Returns the last log index, will return -1 if log is empty.
@@ -114,7 +111,7 @@ public class State
     }
 
     /// <summary>
-    /// Returns the command at index, or null if index is out of bounds
+    /// Returns the command at index, or null if index is out of bounds.
     /// </summary>
     /// <param name="index">The index of the log to look.</param>
     /// <returns>The command at index, or the default value.</returns>
@@ -145,7 +142,6 @@ public class State
     {
         LogEntries.Add(new LogEntry(term, command));
     }
-
 
     /// <summary>
     /// Removes all entries from the specified index to the end of the log.

@@ -47,6 +47,10 @@ public interface IRaftNode
     /// <param name="command">The command to submit to the replicated log.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task SubmitCommandAsync(object command);
-    
+
+    /// <summary>
+    /// Accepts a visitor and calls visit with the nodes internal state.
+    /// </summary>
+    /// <param name="visitor">The <see cref="IRaftNodeVisitor"/> to accept.</param>
     void Accept(IRaftNodeVisitor visitor);
 }

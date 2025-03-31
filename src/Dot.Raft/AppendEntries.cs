@@ -36,4 +36,11 @@ public record AppendEntries
     /// Leader's commit index.
     /// </summary>
     public required int LeaderCommit { get; init; }
+
+    /// <summary>
+    /// The log entries to be appended to the followers log.
+    /// </summary>
+    /// <param name="Term">The <see cref="Term"/>that this command was decided on.</param>
+    /// <param name="Command">The command to append.</param>
+    public record LogEntry(Term Term, object Command);
 }

@@ -21,7 +21,7 @@ public class RandomizedElectionTimeout : IElectionTimer
     /// <summary>
     /// Returns true if the required time has passed to trigger an election.
     /// </summary>
-    /// <returns></returns>
+    /// <returns>True if election should be triggered, false otherwise.</returns>
     public bool ShouldTriggerElection()
     {
         var now = DateTime.UtcNow;
