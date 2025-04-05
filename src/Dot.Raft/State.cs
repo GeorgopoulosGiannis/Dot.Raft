@@ -5,17 +5,46 @@ namespace Dot.Raft;
 /// </summary>
 public class State
 {
-    #region Persisted - The persistent state of a Raft node. It is updated on stable storage before responding to RPCs.
-
     /// <summary>
-    /// Latest term server has seen (initialized to 0 on first boot, increases monotonically).
+    /// Gets or sets latest term server has seen (initialized to 0 on first boot, increases monotonically).
     /// </summary>
     public Term CurrentTerm { get; set; }
 
     /// <summary>
-    /// CandidateId that received vote in current term (or null if none).
+    /// Gets or sets candidateId that received vote in current term (or null if none).
     /// </summary>
     public NodeId? VotedFor { get; set; }
+
+    /// <summary>
+    /// Gets or sets index of the highest log entry known to be commited.
+    /// Initialized to 0, increases monotonically.
+    /// </summary>
+    public int CommitIndex { get; set; } = -1;
+
+    /// <summary>
+    /// Gets or sets index of the highest log entry applied to state machine.
+    /// Initialized to 0, increases monotonically.
+    /// </summary>
+    public int LastApplied { get; set; } = -1;
+
+    /// <summary>
+    /// Gets for each server, index of the next log entry to send to that server.
+    /// Initialized to leader last log index + 1.
+    /// </summary>
+    public List<int> NextIndexes { get; init; } = [];
+
+    /// <summary>
+    /// Gets for each server, index of highest log entry known to be replicated on server.
+    /// Initialized to 0, increases monotonically.
+    /// </summary>
+    public List<int> MatchIndexes { get; init; } = [];
+
+    /// <summary>
+    /// Gets log entries; Each entry contains command for state machine,
+    /// and term when entry was received by leader.
+    /// Paper states that starting index is 1 but, we keep it 0 based.
+    /// </summary>
+    private List<LogEntry> LogEntries { get; init; } = [];
 
     /// <summary>
     /// Determines if a candidate's log is at least as up-to-date as the local log,
@@ -62,13 +91,6 @@ public class State
 
         return LogEntries[index].Term == term;
     }
-
-    /// <summary>
-    /// Log entries; Each entry contains command for state machine,
-    /// and term when entry was received by leader.
-    /// Paper states that starting index is 1 but, we keep it 0 based.
-    /// </summary>
-    private List<LogEntry> LogEntries { get; init; } = [];
 
     /// <summary>
     /// Returns the last log index, will return -1 if log is empty.
@@ -154,38 +176,4 @@ public class State
             LogEntries.RemoveRange(startIndex, LogEntries.Count - startIndex);
         }
     }
-
-    #endregion
-
-    #region Volatile - Volatile state on nodes. Reinitialized after election.
-
-    /// <summary>
-    /// Index of the highest log entry known to be commited.
-    /// Initialized to 0, increases monotonically.
-    /// </summary>
-    public int CommitIndex { get; set; } = -1;
-
-    /// <summary>
-    /// Index of the highest log entry applied to state machine.
-    /// Initialized to 0, increases monotonically.
-    /// </summary>
-    public int LastApplied { get; set; } = -1;
-
-    #endregion
-
-    #region Leader Volatile
-
-    /// <summary>
-    /// For each server, index of the next log entry to send to that server.
-    /// Initialized to leader last log index + 1.
-    /// </summary>
-    public List<int> NextIndexes { get; init; } = [];
-
-    /// <summary>
-    /// For each server, index of highest log entry known to be replicated on server.
-    /// Initialized to 0, increases monotonically.
-    /// </summary>
-    public List<int> MatchIndexes { get; init; } = [];
-
-    #endregion
 }

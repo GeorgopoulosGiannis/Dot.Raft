@@ -10,5 +10,6 @@ public interface IRaftTransport
     /// </summary>
     /// <param name="sendTo">The <see cref="NodeId"/> to send the command to.</param>
     /// <param name="command">The command to send.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     Task SendAsync(NodeId sendTo, object command);
 }

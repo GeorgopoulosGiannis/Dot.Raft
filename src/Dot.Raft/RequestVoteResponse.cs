@@ -6,17 +6,17 @@
 public record RequestVoteResponse
 {
     /// <summary>
-    /// Current term for candidate to update itself.
+    /// Gets current term for candidate to update itself.
     /// </summary>
-    public required Term Term { get; init; } = default;
+    public required Term Term { get; init; }
 
     /// <summary>
-    /// True means candidate received vote.
+    /// Gets a value indicating whether true means candidate received vote.
     /// </summary>
     public required bool VoteGranted { get; init; }
 
     /// <summary>
-    /// The <see cref="NodeId"/> of the node that sends the reply.
+    /// Gets the <see cref="NodeId"/> of the node that sends the reply.
     /// </summary>
     public required NodeId ReplierId { get; init; }
 }

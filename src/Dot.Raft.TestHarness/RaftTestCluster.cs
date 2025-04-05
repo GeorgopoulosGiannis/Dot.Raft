@@ -1,8 +1,8 @@
 namespace Dot.Raft.TestHarness;
 
 /// <summary>
-/// Simulates a RAFT cluster in-memory for testing purposes. 
-/// Provides utilities to join nodes, control time progression, simulate partitions, 
+/// Simulates a RAFT cluster in-memory for testing purposes.
+/// Provides utilities to join nodes, control time progression, simulate partitions,
 /// and perform assertions against the cluster.
 /// </summary>
 public class RaftTestCluster
@@ -35,12 +35,14 @@ public class RaftTestCluster
         for (var i = 0; i < times; i++)
         {
             foreach (var host in _hosts)
+            {
                 await host.TickAsync();
+            }
         }
     }
 
     /// <summary>
-    /// Returns the single leader in the cluster, or throws an exception 
+    /// Returns the single leader in the cluster, or throws an exception
     /// if zero or multiple leaders exist.
     /// </summary>
     /// <returns>The node currently acting as the RAFT leader.</returns>
@@ -51,7 +53,9 @@ public class RaftTestCluster
             host.Node.Role == RaftRole.Leader).ToList();
 
         if (leaders.Count != 1)
+        {
             throw new InvalidOperationException($"Expected exactly one leader, but found {leaders.Count}.");
+        }
 
         return leaders[0].Node;
     }
@@ -82,11 +86,12 @@ public class RaftTestCluster
     /// <summary>
     /// Submits a command to the current leader in the cluster.
     /// </summary>
-    /// <param name="command">The command to submit.</param>
-    public async Task SubmitToLeaderAsync(object command)
+    /// <param name="envelope">The wrapped command to submit.</param>
+    public Task SubmitToLeaderAsync(ClientCommandEnvelope envelope)
     {
         var leader = GetLeader();
-        await leader.SubmitCommandAsync(command);
+        _ = leader.SubmitCommandAsync(envelope);
+        return Task.CompletedTask;
     }
 
     /// <summary>

@@ -4,9 +4,9 @@ public class DummyStateMachine : IStateMachine
 {
     public List<object> AppliedCommands { get; } = [];
 
-    public Task ApplyAsync(object command)
+    public Task<object> ApplyAsync(object command)
     {
         AppliedCommands.Add(command);
-        return Task.CompletedTask;
+        return Task.FromResult<object>("Ok");
     }
 }

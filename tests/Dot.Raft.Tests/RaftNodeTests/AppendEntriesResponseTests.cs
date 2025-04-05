@@ -31,9 +31,9 @@ public class AppendEntriesResponseTests
                 ReplierId = peers[1],
                 Term = new Term(6),
             });
-        
-        state.AddLogEntry(new Term(5), "set x"); // log index - 0 
-        
+
+        state.AddLogEntry(new Term(5), "set x"); // log index - 0
+
         // Start append entries
         await node.TickAsync();
 
@@ -86,7 +86,7 @@ public class AppendEntriesResponseTests
             });
 
         // submit a new command (term 6)
-        await node.SubmitCommandAsync("set x");
+        var submitCommandTask= node.SubmitCommandAsync(new ClientCommandEnvelope("client1",1,"set x"));
 
         // follower 2 confirms replication of entry at index 0
         await node.ReceivePeerMessageAsync(new AppendEntriesResponse
@@ -96,7 +96,7 @@ public class AppendEntriesResponseTests
             Success = true
         });
 
-
+        await submitCommandTask;
         // Commit index should now be advanced to 0
         state.CommitIndex.ShouldBe(0);
     }

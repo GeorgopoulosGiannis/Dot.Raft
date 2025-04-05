@@ -15,7 +15,8 @@ public interface IRaftNodeVisitor
     /// <param name="role">The current role of the node (Follower, Candidate, or Leader).</param>
     /// <param name="state">The internal state of the node, including log, term, commit index, etc.</param>
     /// <param name="stateMachine">The state machine associated with the node that receives committed commands.</param>
-    void Visit<TStateMachine>(NodeId id,
+    void Visit<TStateMachine>(
+        NodeId id,
         Term term,
         RaftRole role,
         State state,

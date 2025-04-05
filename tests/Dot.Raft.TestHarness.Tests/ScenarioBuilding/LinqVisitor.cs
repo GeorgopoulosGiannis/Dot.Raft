@@ -9,26 +9,26 @@ namespace Dot.Raft.TestHarness.Tests.ScenarioBuilding;
 /// role, state, and associated state machine.
 /// </param>
 public class LinqVisitor(
-    Action<NodeId, Term, RaftRole, State, IStateMachine> action
+	Action<NodeId, Term, RaftRole, State, IStateMachine> action
 ) : IRaftNodeVisitor
 {
-    /// <summary>
-    /// Visits a node and invokes the provided action delegate.
-    /// </summary>
-    /// <typeparam name="TStateMachine">The concrete type of the state machine.</typeparam>
-    /// <param name="id">The ID of the Raft node being visited.</param>
-    /// <param name="term">The current term of the node.</param>
-    /// <param name="role">The role of the node (Follower, Candidate, or Leader).</param>
-    /// <param name="state">The internal Raft state object of the node.</param>
-    /// <param name="stateMachine">The state machine associated with the node.</param>
-    public void Visit<TStateMachine>(
-        NodeId id,
-        Term term,
-        RaftRole role,
-        State state,
-        TStateMachine stateMachine)
-        where TStateMachine : IStateMachine
-    {
-        action(id, term, role, state, stateMachine);
-    }
+	/// <summary>
+	/// Visits a node and invokes the provided action delegate.
+	/// </summary>
+	/// <typeparam name="TStateMachine">The concrete type of the state machine.</typeparam>
+	/// <param name="id">The ID of the Raft node being visited.</param>
+	/// <param name="term">The current term of the node.</param>
+	/// <param name="role">The role of the node (Follower, Candidate, or Leader).</param>
+	/// <param name="state">The internal Raft state object of the node.</param>
+	/// <param name="stateMachine">The state machine associated with the node.</param>
+	public void Visit<TStateMachine>(
+		NodeId id,
+		Term term,
+		RaftRole role,
+		State state,
+		TStateMachine stateMachine)
+		where TStateMachine : IStateMachine
+	{
+		action(id, term, role, state, stateMachine);
+	}
 }

@@ -3,7 +3,7 @@ using Shouldly;
 
 namespace Dot.Raft.TestHarness.Tests.ScenarioBuilding;
 
-public class AppliedCommandsVisitor(List<object> expectedCommands) : IRaftNodeVisitor
+public class AppliedCommandsVisitor(List<ClientCommandEnvelope> expectedCommands) : IRaftNodeVisitor
 {
     public void Visit<TStateMachine>(
         NodeId id,

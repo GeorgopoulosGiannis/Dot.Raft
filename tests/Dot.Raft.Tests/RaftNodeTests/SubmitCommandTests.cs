@@ -36,29 +36,20 @@ public class SubmitCommandTests
         // become leader
         await node.TickAsync();
         await node.ReceivePeerMessageAsync(
-            new RequestVoteResponse
-            {
-                ReplierId = peers[0],
-                Term = new Term(4),
-                VoteGranted = true
-            });
+            new RequestVoteResponse { ReplierId = peers[0], Term = new Term(4), VoteGranted = true });
         await node.ReceivePeerMessageAsync(
-            new RequestVoteResponse
-            {
-                ReplierId = peers[1],
-                Term = new Term(4),
-                VoteGranted = true
-            });
+            new RequestVoteResponse { ReplierId = peers[1], Term = new Term(4), VoteGranted = true });
 
         transport.Sent.Clear();
 
         // submit a command
-        await node.SubmitCommandAsync("x");
+        var command = new ClientCommandEnvelope("client1", 1, "x");
+        _ = node.SubmitCommandAsync(command);
 
         state
             .GetCommandAtIndex(state.GetLastLogIndex())
-            .ShouldBe("x");
-        
+            .ShouldBe(command);
+
         transport.Sent.Count.ShouldBe(2);
 
         foreach (var sent in transport.Sent)
@@ -66,7 +57,7 @@ public class SubmitCommandTests
             sent.Message.ShouldBeOfType<AppendEntries>();
             var request = (AppendEntries)sent.Message;
             request.Entries.Length.ShouldBe(1);
-            request.Entries[0].Command.ShouldBe("x");
+            request.Entries[0].Command.ShouldBe(command);
             request.PrevLogIndex.ShouldBe(-1);
             request.PrevLogTerm.ShouldBe(new Term(0));
         }

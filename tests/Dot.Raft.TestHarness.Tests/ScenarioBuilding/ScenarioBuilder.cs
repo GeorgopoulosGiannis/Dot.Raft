@@ -11,8 +11,7 @@ namespace Dot.Raft.TestHarness.Tests.ScenarioBuilding;
 public class ScenarioBuilder
 {
     private readonly RaftTestCluster _cluster;
-    private readonly List<object> _submittedCommands = [];
-
+    private readonly List<ClientCommandEnvelope> _submittedCommands = [];
     private readonly List<NodeId> _nodeIds = [];
 
     public IReadOnlyList<NodeId> NodeIds => _nodeIds;
@@ -73,8 +72,10 @@ public class ScenarioBuilder
     /// <returns>The current <see cref="ScenarioBuilder"/> instance for further chaining.</returns>
     public async Task<ScenarioBuilder> SubmitCommand(object command)
     {
-        await _cluster.SubmitToLeaderAsync(command);
-        _submittedCommands.Add(command);
+        var envelope =
+            new ClientCommandEnvelope("scenarioBuilder", _submittedCommands.Count, command);
+        await _cluster.SubmitToLeaderAsync(envelope);
+        _submittedCommands.Add(envelope);
         return this;
     }
 

@@ -10,6 +10,6 @@ public interface IStateMachine
     /// to the state machine.
     /// </summary>
     /// <param name="command">The command to apply. Raft is command type agnostic.</param>
-    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    Task ApplyAsync(object command);
+    /// <returns>Anything that needs to be returned from the application. Raft does not care about this value.</returns>
+    Task<object> ApplyAsync(object command);
 }

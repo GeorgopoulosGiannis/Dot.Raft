@@ -41,12 +41,22 @@ public interface IRaftNode
     Task ReceivePeerMessageAsync(object message);
 
     /// <summary>
-    /// Submits a command to the Raft log. If the node is the leader, the command will be replicated to followers.
-    /// If not the leader, the command may be rejected or redirected.
+    /// Submits a client command to the Raft log for replication and execution.
+    /// The command must be uniquely identified by a combination of <c>ClientId</c> and <c>SequenceNumber</c>
+    /// to support deduplication and ensure at-most-once execution semantics.
+    /// <para>
+    /// If the current node is the leader, the command will be appended to its log and replicated to a majority of followers.
+    /// Once committed, it will be applied to the state machine and the result will be returned.
+    /// </para>
+    /// <para>
+    /// If the node is not the leader, the command will be rejected or redirected, depending on implementation.
+    /// </para>
     /// </summary>
-    /// <param name="command">The command to submit to the replicated log.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    Task SubmitCommandAsync(object command);
+    /// <param name="command">The client-wrapped command containing metadata for deduplication and the actual payload.</param>
+    /// <returns>
+    /// A task that completes with the result of executing the command, or <c>null</c> if the node is not the leader.
+    /// </returns>
+    Task<object?> SubmitCommandAsync(ClientCommandEnvelope command);
 
     /// <summary>
     /// Accepts a visitor and calls visit with the nodes internal state.

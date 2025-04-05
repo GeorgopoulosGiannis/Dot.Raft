@@ -6,17 +6,17 @@
 public record AppendEntriesResponse
 {
     /// <summary>
-    /// True if follower contained entry matching prevLogIndex and prevLogTerm.
+    /// Gets a value indicating whether the follower contained entry matching prevLogIndex and prevLogTerm.
     /// </summary>
     public bool Success { get; init; }
 
     /// <summary>
-    /// currentTerm, for leader to update itself.
+    /// Gets currentTerm, for leader to update itself.
     /// </summary>
     public Term Term { get; init; }
 
     /// <summary>
-    /// The <see cref="NodeId"/> of the node sending the reply.
+    /// Gets the <see cref="NodeId"/> of the node sending the reply.
     /// </summary>
     public required NodeId ReplierId { get; init; }
 }

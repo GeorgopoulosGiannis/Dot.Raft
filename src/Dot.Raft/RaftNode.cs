@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace Dot.Raft;
 
 /// <inheritdoc/>
@@ -9,12 +11,15 @@ public class RaftNode : IRaftNode
     private readonly IHeartbeatTimer _heartbeatTimer;
 
     private readonly List<NodeId> _peers;
-    private State State { get; } = new();
+
+    private readonly
+        ConcurrentDictionary<(string clientId, int sequenceNum),
+            TaskCompletionSource<object?>> _pendingCommands = new();
 
     private HashSet<NodeId> _votesReceived = [];
 
     /// <summary>
-    /// Creates a new <see cref="RaftNode"/> with an explicitly provided state.
+    /// Initializes a new instance of the <see cref="RaftNode"/> class with an explicitly provided state.
     /// </summary>
     /// <remarks>
     /// This constructor should only be used when a specific <see cref="State"/> instance needs to be injected,
@@ -34,19 +39,20 @@ public class RaftNode : IRaftNode
         State state,
         IElectionTimer electionTimer,
         IHeartbeatTimer heartbeatTimer,
-        IStateMachine stateMachine) : this(
-        nodeId,
-        peers,
-        transport,
-        electionTimer,
-        heartbeatTimer,
-        stateMachine)
+        IStateMachine stateMachine)
+        : this(
+            nodeId,
+            peers,
+            transport,
+            electionTimer,
+            heartbeatTimer,
+            stateMachine)
     {
         State = state;
     }
 
     /// <summary>
-    /// Creates a new <see cref="Raft.RaftNode"/> with a default state.
+    /// Initializes a new instance of the <see cref="RaftNode"/> class.
     /// </summary>
     /// <param name="nodeId">The <see cref="NodeId"/> of the current node.</param>
     /// <param name="peers">The peers of the RAFT cluster.</param>
@@ -54,7 +60,8 @@ public class RaftNode : IRaftNode
     /// <param name="electionTimer">The <see cref="IElectionTimer"/> to use in order to determine election timeouts.</param>
     /// <param name="heartbeatTimer">The <see cref="IHeartbeatTimer"/> to use in order to trigger heartbeat broadcasts.</param>
     /// <param name="stateMachine">The <see cref="IStateMachine"/>That log commands will be applied to.</param>
-    public RaftNode(NodeId nodeId,
+    public RaftNode(
+        NodeId nodeId,
         List<NodeId> peers,
         IRaftTransport transport,
         IElectionTimer electionTimer,
@@ -82,20 +89,22 @@ public class RaftNode : IRaftNode
     /// <inheritdoc />
     public RaftRole Role { get; private set; } = RaftRole.Follower;
 
+    private State State { get; } = new();
+
     /// <inheritdoc />
     public async Task TickAsync()
     {
         if (Role is RaftRole.Follower or RaftRole.Candidate && _electionTimer.ShouldTriggerElection())
         {
-            await StartElectionAsync();
+            await StartElectionAsync().ConfigureAwait(false);
         }
 
         if (Role is RaftRole.Leader && _heartbeatTimer.ShouldSendHeartbeat())
         {
-            await BroadcastHeartbeatAsync();
+            await BroadcastHeartbeatAsync().ConfigureAwait(false);
         }
 
-        await ApplyCommitedEntries();
+        await ApplyCommitedEntries().ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -109,20 +118,25 @@ public class RaftNode : IRaftNode
             AppendEntriesResponse response => ReceiveAsync(response),
             _ => throw new ArgumentOutOfRangeException(nameof(message), message, "Unknown message type"),
         };
-        await task;
+        await task.ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task SubmitCommandAsync(object command)
+    public async Task<object?> SubmitCommandAsync(ClientCommandEnvelope command)
     {
         if (Role != RaftRole.Leader)
         {
-            return;
+            throw new InvalidOperationException("Only leader can accept commands.");
         }
+
+        var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _pendingCommands[(command.ClientId, command.SequenceNumber)] = tcs;
 
         State.AddLogEntry(State.CurrentTerm, command);
 
-        await BroadcastHeartbeatAsync();
+        await BroadcastHeartbeatAsync().ConfigureAwait(false);
+        return await tcs.Task.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -150,10 +164,13 @@ public class RaftNode : IRaftNode
         var lastLogIndex = State.GetLastLogIndex();
         var lastLogTerm = State.GetLastLogTerm();
 
-        var request = new RequestVote { Term = State.CurrentTerm, CandidateId = Id, LastLogIndex = lastLogIndex, LastLogTerm = lastLogTerm };
+        var request = new RequestVote
+        {
+            CandidateId = Id, Term = State.CurrentTerm, LastLogIndex = lastLogIndex, LastLogTerm = lastLogTerm,
+        };
 
         await Task.WhenAll(
-            _peers.Select(peer => _transport.SendAsync(peer, request)));
+            _peers.Select(peer => _transport.SendAsync(peer, request))).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -176,7 +193,7 @@ public class RaftNode : IRaftNode
             .Select(SendAppendEntriesAsync)
             .ToList();
 
-        await Task.WhenAll(heartbeatTasks);
+        await Task.WhenAll(heartbeatTasks).ConfigureAwait(false);
     }
 
     private async Task SendAppendEntriesAsync(NodeId nodeId)
@@ -201,7 +218,7 @@ public class RaftNode : IRaftNode
             Entries = entries,
         };
 
-        await _transport.SendAsync(nodeId, request);
+        await _transport.SendAsync(nodeId, request).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -215,7 +232,10 @@ public class RaftNode : IRaftNode
     {
         if (requestVote.Term < State.CurrentTerm)
         {
-            await _transport.SendAsync(requestVote.CandidateId, new RequestVoteResponse { ReplierId = Id, Term = State.CurrentTerm, VoteGranted = false, });
+            await _transport.SendAsync(
+                    requestVote.CandidateId,
+                    new RequestVoteResponse { ReplierId = Id, Term = State.CurrentTerm, VoteGranted = false, })
+                .ConfigureAwait(false);
             return;
         }
 
@@ -236,7 +256,10 @@ public class RaftNode : IRaftNode
             State.VotedFor = requestVote.CandidateId;
         }
 
-        await _transport.SendAsync(requestVote.CandidateId, new RequestVoteResponse { ReplierId = Id, Term = State.CurrentTerm, VoteGranted = shouldGrantVote, });
+        await _transport.SendAsync(
+                requestVote.CandidateId,
+                new RequestVoteResponse { ReplierId = Id, Term = State.CurrentTerm, VoteGranted = shouldGrantVote, })
+            .ConfigureAwait(false);
     }
 
     /// <summary>
@@ -267,7 +290,7 @@ public class RaftNode : IRaftNode
         }
 
         _votesReceived.Add(response.ReplierId);
-        var majority = (_peers.Count + 1) / 2 + 1;
+        int majority = ((_peers.Count + 1) / 2) + 1;
 
         if (_votesReceived.Count < majority)
         {
@@ -296,7 +319,10 @@ public class RaftNode : IRaftNode
     {
         if (request.Term < State.CurrentTerm)
         {
-            await _transport.SendAsync(request.LeaderId, new AppendEntriesResponse { ReplierId = Id, Term = State.CurrentTerm, Success = false, });
+            await _transport.SendAsync(
+                    request.LeaderId,
+                    new AppendEntriesResponse { ReplierId = Id, Term = State.CurrentTerm, Success = false, })
+                .ConfigureAwait(false);
             return;
         }
 
@@ -313,7 +339,10 @@ public class RaftNode : IRaftNode
         // whose term matches prevLogTerm
         if (request.PrevLogIndex >= 0 && !State.HasMatchingEntry(request.PrevLogIndex, request.PrevLogTerm))
         {
-            await _transport.SendAsync(request.LeaderId, new AppendEntriesResponse { ReplierId = Id, Term = State.CurrentTerm, Success = false, });
+            await _transport.SendAsync(
+                    request.LeaderId,
+                    new AppendEntriesResponse { ReplierId = Id, Term = State.CurrentTerm, Success = false, })
+                .ConfigureAwait(false);
             return;
         }
 
@@ -360,10 +389,13 @@ public class RaftNode : IRaftNode
         if (request.LeaderCommit > State.CommitIndex)
         {
             State.CommitIndex = Math.Max(Math.Min(request.LeaderCommit, State.GetLastLogIndex()), 0);
-            await ApplyCommitedEntries();
+            await ApplyCommitedEntries().ConfigureAwait(false);
         }
 
-        await _transport.SendAsync(request.LeaderId, new AppendEntriesResponse { ReplierId = Id, Term = State.CurrentTerm, Success = true, });
+        await _transport.SendAsync(
+                request.LeaderId,
+                new AppendEntriesResponse { ReplierId = Id, Term = State.CurrentTerm, Success = true, })
+            .ConfigureAwait(false);
     }
 
     /// <summary>
@@ -410,7 +442,7 @@ public class RaftNode : IRaftNode
                 State.CommitIndex = majorityIndex;
             }
 
-            await ApplyCommitedEntries();
+            await ApplyCommitedEntries().ConfigureAwait(false);
         }
         else
         {
@@ -430,8 +462,8 @@ public class RaftNode : IRaftNode
                     .GetLogEntries(nextIndex)
                     .Select(entry => new AppendEntries.LogEntry(entry.Term, entry.Command))
                     .ToArray(),
-                LeaderCommit = State.CommitIndex
-            });
+                LeaderCommit = State.CommitIndex,
+            }).ConfigureAwait(false);
         }
     }
 
@@ -441,9 +473,18 @@ public class RaftNode : IRaftNode
         {
             State.LastApplied++;
             var entry = State.GetCommandAtIndex(State.LastApplied);
-            if (entry is not null)
+            if (entry is ClientCommandEnvelope command)
             {
-                await StateMachine.ApplyAsync(entry);
+                var result = await StateMachine.ApplyAsync(entry).ConfigureAwait(false);
+                var key = (command.ClientId, command.SequenceNumber);
+                if (_pendingCommands.TryRemove(key, out var tcs))
+                {
+                    tcs.TrySetResult(result);
+                }
+            }
+            else if (entry is not null)
+            {
+                await StateMachine.ApplyAsync(entry).ConfigureAwait(false);
             }
         }
     }

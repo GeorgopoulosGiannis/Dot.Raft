@@ -1,30 +1,30 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>CA2007</NoWarn>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
 
-        <IsPackable>false</IsPackable>
-        <IsTestProject>true</IsTestProject>
-    </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0"/>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0"/>
+    <PackageReference Include="Shouldly" Version="4.3.0"/>
+    <PackageReference Include="xunit" Version="2.5.3"/>
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3"/>
+  </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="coverlet.collector" Version="6.0.0"/>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0"/>
-        <PackageReference Include="Shouldly" Version="4.3.0"/>
-        <PackageReference Include="xunit" Version="2.5.3"/>
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3"/>
-    </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit"/>
+  </ItemGroup>
 
-    <ItemGroup>
-        <Using Include="Xunit"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <ProjectReference Include="..\..\src\Dot.Raft.TestHarness\Dot.Raft.TestHarness.csproj"/>
-        <ProjectReference Include="..\..\src\Dot.Raft\Dot.Raft.csproj"/>
-        <ProjectReference Include="..\Dot.Raft.Testing.Utilities\Dot.Raft.Testing.Utilities.csproj"/>
-    </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Dot.Raft.TestHarness\Dot.Raft.TestHarness.csproj"/>
+    <ProjectReference Include="..\..\src\Dot.Raft\Dot.Raft.csproj"/>
+    <ProjectReference Include="..\Dot.Raft.Testing.Utilities\Dot.Raft.Testing.Utilities.csproj"/>
+  </ItemGroup>
 
 </Project>
