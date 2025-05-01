@@ -1,47 +1,45 @@
 # Dot.Raft
 
-Dot.Raft is a modular implementation of the [Raft consensus algorithm](https://raft.github.io/) in .NET, built with testability, clarity, and extensibility in mind.
+**⚠️ Work in Progress**  
+Dot.Raft is a modular and testable implementation of the Raft consensus algorithm in .NET. It is currently under development and **not yet production-ready**. APIs may change as the library evolves, and no complete example in a real application exists yet—aside from a test harness used for simulations.
 
-It aims to provide a maintainable and verifiable foundation for distributed systems that require consensus, while remaining easy to reason about and simulate.
+---
+
+## Overview
+
+Dot.Raft is designed to be:
+
+- Faithful to the [original Raft paper](https://raft.github.io/)
+- Easy to simulate, reason about, and test
+- Separated cleanly between Raft core logic, transport, and state machine concerns
+- Useful as a foundation for building distributed systems in .NET
 
 ---
 
 ## Goals
 
-- Faithfully implement the Raft algorithm as described in the original paper
-- Keep the codebase test-driven and minimal
-- Provide a reusable IRaftNode interface for external usage
-- Allow realistic simulation of clusters using a custom test harness
-- Enable verification of cluster behavior under partitions and message delays
-- Maintain clean separation between Raft logic and messaging/state management
+- ✅ Implement the Raft algorithm correctly and clearly
+- ✅ Support testing and simulation of network partitions, delays, and leadership changes
+- ✅ Provide a reusable `IRaftNode` abstraction for integration
+- ⚠️ Real-world transport/state machine integrations and examples are *planned*
+- ⚠️ Public API is *subject to change* as the library matures
 
 ---
 
-## Structure
+## Key Features
 
-The repository is organized into the following projects:
-
-- `Dot.Raft` — the core Raft implementation
-- `Dot.Raft.TestHarness` — tools for simulating and testing clusters
-- `Dot.Raft.Tests` — unit tests for internal components
-- `Dot.Raft.TestHarness.Tests` — high-level integration tests using the test harness
-- `Dot.Raft.Testing.Utilities` — common testing utilities shared across test projects
+- **Leader election** and **heartbeats**
+- **Log replication** with consistency guarantees
+- **Safety** via Raft's log matching properties
+- **State machine application** of committed commands
+- **Pluggable transport** via `IRaftTransport`
+- **Logical time simulation** for testing scenarios
 
 ---
-
-## Features Implemented
-
-- Leader election and heartbeats
-- Log replication
-- Safety guarantees for log consistency
-- State machine command application
-- Message transport abstraction (`IRaftTransport`)
-- Logical time simulation
-
 
 ## Getting Started
 
-To create a Raft node:
+Create a Raft node:
 
 ```csharp
 var node = new RaftNode(
@@ -55,28 +53,27 @@ var node = new RaftNode(
 
 await node.StartAsync();
 ```
-The node exposes methods such as:
 
-`ReceivePeerMessageAsync(...)` — for handling incoming messages
+Basic API:
+```csharp
+await node.ReceivePeerMessageAsync(message);      // Handle incoming message
+await node.SubmitCommandAsync(new MyCommand());   // Submit command to leader
+node.Accept(new MyDiagnosticVisitor());           // Inspect internal state
+```
 
-`SubmitCommandAsync(object command)` — to submit a command to the replicated state machine
 
-`Accept(IRaftNodeVisitor)` — for exposing internal state for testing or diagnostics
+## Simulation & Testing
 
----
-
-## Testing and Simulation
-The test harness allows for simulating clusters, partitions, and logical time:
+You can simulate a Raft cluster and control logical time:
 
 ```csharp
 var cluster = ClusterFactory.Create(3);
-
 await cluster.TickUntilLeaderElected();
 await cluster.SubmitToLeaderAsync("set x = 42");
 await cluster.TickAllAsync(50);
 ```
 
-A fluent scenario API is also available:
+or use the fluent api of the scenario builder
 
 ```csharp
 await ScenarioBuilder.Build(3)
@@ -86,19 +83,21 @@ await ScenarioBuilder.Build(3)
     .Then(x => x.AssertAllApplied());
 ```
 
-Cluster state can be inspected using the visitor pattern:
+
+### Observability via Visitors
+
+Use a built-in visitor:
 
 ```csharp
-cluster.VisitNodes(new DebugVisitor(output));
+cluster.VisitNodes(new DebugVisitor(Console.Out));
 ```
 
-Or you can write your own visitor:
+Or create a custom one:
 
 ```csharp
 public class StatePrinter : IRaftNodeVisitor
 {
-    public void Visit<TStateMachine>(
-        NodeId id, Term term, RaftRole role, State state, TStateMachine stateMachine)
+    public void Visit<TStateMachine>(NodeId id, Term term, RaftRole role, State state, TStateMachine stateMachine)
         where TStateMachine : IStateMachine
     {
         Console.WriteLine($"Node {id.Id} | Role: {role} | Term: {term.Value}");
@@ -107,17 +106,31 @@ public class StatePrinter : IRaftNodeVisitor
     }
 }
 ```
----
 
-## Project Structure
+## Status & Roadmap
 
-```text
-src/
-├── Dot.Raft                  # Core Raft logic and abstractions
-├── Dot.Raft.TestHarness      # Cluster simulation with in-memory transport
+| Feature                                    | Status        |
+|--------------------------------------------|---------------|
+| Leader election & heartbeats               | ✅ Implemented |
+| Log replication                            | ✅ Implemented |
+| Cluster test harness                       | ✅ Implemented |
+| State machine integration                  | ✅ Basic       |
+| Public API stability                       | ⚠️ Changing    |
+| Real-world usage example                   | ❌ Not yet     |
+| Snapshotting & log compaction              | 🚧 Planned     |
+| Raft membership changes (joint consensus)  | 🚧 Planned     |
 
-tests/
-├── Dot.Raft.Tests                  # Unit tests for RaftNode
-├── Dot.Raft.TestHarness.Tests      # Cluster behavior tests
-├── Dot.Raft.Testing.Utilities      # Shared test helpers (timers, transports, etc.)
-```
+
+## Contributing
+
+Contributions are welcome!
+This project is evolving and feedback, use cases, and test cases are incredibly valuable at this stage.
+
+## License
+
+MIT License
+
+
+
+
+
